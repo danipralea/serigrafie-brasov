@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import {
   signInWithEmailAndPassword,
   signInWithPopup,
@@ -7,7 +7,9 @@ import {
   onAuthStateChanged,
   sendPasswordResetEmail as firebaseSendPasswordResetEmail,
   RecaptchaVerifier,
-  signInWithPhoneNumber
+  signInWithPhoneNumber,
+  User,
+  ConfirmationResult
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
@@ -19,7 +21,30 @@ declare global {
   }
 }
 
-const AuthContext = createContext<any>(null);
+interface UserProfile {
+  email: string | null;
+  phoneNumber?: string | null;
+  displayName: string | null;
+  isTeamMember: boolean;
+  isAdmin: boolean;
+  createdAt: Date;
+  photoURL?: string | null;
+  teamOwnerId?: string;
+}
+
+interface AuthContextType {
+  currentUser: User | null;
+  userProfile: UserProfile | null;
+  login: (email: string, password: string) => Promise<any>;
+  loginWithGoogle: () => Promise<any>;
+  logout: () => Promise<void>;
+  sendPasswordResetEmail: (email: string) => Promise<void>;
+  setupRecaptcha: (containerId: string) => RecaptchaVerifier | null;
+  loginWithPhone: (phoneNumber: string) => Promise<ConfirmationResult>;
+  refreshUserProfile: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | null>(null);
 
 export function useAuth() {
   const context = useContext(AuthContext);
@@ -29,9 +54,13 @@ export function useAuth() {
   return context;
 }
 
-export function AuthProvider({ children }) {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [userProfile, setUserProfile] = useState(null);
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export function AuthProvider({ children }: AuthProviderProps) {
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -44,11 +73,11 @@ export function AuthProvider({ children }) {
         const userDoc = await getDoc(userDocRef);
 
         if (userDoc.exists()) {
-          const existingProfile = userDoc.data();
+          const existingProfile = userDoc.data() as UserProfile;
 
           // Update profile if phone number is missing but user has one
           if (user.phoneNumber && !existingProfile.phoneNumber) {
-            const updatedProfile = {
+            const updatedProfile: UserProfile = {
               ...existingProfile,
               phoneNumber: user.phoneNumber
             };
@@ -80,7 +109,7 @@ export function AuthProvider({ children }) {
     return unsubscribe;
   }, []);
 
-  async function login(email, password) {
+  async function login(email: string, password: string) {
     return signInWithEmailAndPassword(auth, email, password);
   }
 
@@ -93,7 +122,7 @@ export function AuthProvider({ children }) {
     return signOut(auth);
   }
 
-  async function sendPasswordResetEmail(email) {
+  async function sendPasswordResetEmail(email: string) {
     return firebaseSendPasswordResetEmail(auth, email);
   }
 
@@ -140,7 +169,7 @@ export function AuthProvider({ children }) {
       const userDocRef = doc(db, 'users', currentUser.uid);
       const userDoc = await getDoc(userDocRef);
       if (userDoc.exists()) {
-        setUserProfile(userDoc.data());
+        setUserProfile(userDoc.data() as UserProfile);
       }
     }
   }
