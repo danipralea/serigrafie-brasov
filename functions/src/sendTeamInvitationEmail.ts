@@ -27,6 +27,7 @@
  */
 
 import * as functions from "firebase-functions";
+import {defineSecret} from "firebase-functions/params";
 import * as nodemailer from "nodemailer";
 
 interface InvitationEmailData {
@@ -37,26 +38,15 @@ interface InvitationEmailData {
   invitationLink: string;
 }
 
-// Email configuration from environment variables
-// Works with both deployed and local environments
-const EMAIL_USER = process.env.EMAIL_USER || functions.config().email?.user;
-const EMAIL_PASS = process.env.EMAIL_PASS || functions.config().email?.pass;
-
-// Create transporter
-let transporter: nodemailer.Transporter | null = null;
-if (EMAIL_USER && EMAIL_PASS) {
-  transporter = nodemailer.createTransport({
-    service: "gmail", // Change to 'outlook', 'yahoo', etc. if needed
-    auth: {
-      user: EMAIL_USER,
-      pass: EMAIL_PASS,
-    },
-  });
-}
+// Define secrets for email configuration
+const emailUser = defineSecret("EMAIL_USER");
+const emailPass = defineSecret("EMAIL_PASS");
 
 const FROM_NAME = "Serigrafie Brasov";
 
-export const sendTeamInvitationEmail = functions.https.onCall(
+export const sendTeamInvitationEmail = functions
+  .runWith({secrets: [emailUser, emailPass]})
+  .https.onCall(
   async (
     data: InvitationEmailData,
     context: functions.https.CallableContext
@@ -69,14 +59,27 @@ export const sendTeamInvitationEmail = functions.https.onCall(
       );
     }
 
+    // Get secret values
+    const emailUserValue = emailUser.value();
+    const emailPassValue = emailPass.value();
+
     // Check if email is configured
-    if (!transporter) {
+    if (!emailUserValue || !emailPassValue) {
       throw new functions.https.HttpsError(
         "failed-precondition",
         "Email service is not configured. " +
-        "Please set email.user and email.pass in Firebase config."
+        "Please set EMAIL_USER and EMAIL_PASS secrets."
       );
     }
+
+    // Create transporter with secret values
+    const transporter = nodemailer.createTransport({
+      service: "gmail", // Change to 'outlook', 'yahoo', etc. if needed
+      auth: {
+        user: emailUserValue,
+        pass: emailPassValue,
+      },
+    });
 
     // Validate required fields
     const {email, inviterName, inviterEmail, role, invitationLink} = data;
@@ -270,7 +273,7 @@ If you didn't expect this invitation, you can safely ignore this email.
     try {
       // Send email using Nodemailer
       const mailOptions: nodemailer.SendMailOptions = {
-        from: `"${FROM_NAME}" <${EMAIL_USER}>`,
+        from: `"${FROM_NAME}" <${emailUserValue}>`,
         to: email,
         subject:
           `You've been invited to join ${inviterName}'s team on Serigrafie Brasov`,

@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
+import NotificationProvider from './components/NotificationProvider';
 import PrivateRoute from './components/PrivateRoute';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
@@ -9,34 +9,14 @@ import PlaceOrder from './pages/PlaceOrder';
 import Profile from './pages/Profile';
 import AcceptInvitation from './pages/AcceptInvitation';
 import TeamManagement from './pages/TeamManagement';
+import Clients from './pages/Clients';
 
 function App() {
   return (
     <Router>
       <AuthProvider>
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 5000,
-            style: {
-              background: '#363636',
-              color: '#fff',
-            },
-            success: {
-              duration: 3000,
-              style: {
-                background: '#10b981',
-              },
-            },
-            error: {
-              duration: 4000,
-              style: {
-                background: '#ef4444',
-              },
-            },
-          }}
-        />
-        <Routes>
+        <NotificationProvider>
+          <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/accept-invitation/:invitationId" element={<AcceptInvitation />} />
@@ -65,7 +45,16 @@ function App() {
               </PrivateRoute>
             }
           />
-        </Routes>
+          <Route
+            path="/clients"
+            element={
+              <PrivateRoute>
+                <Clients />
+              </PrivateRoute>
+            }
+          />
+          </Routes>
+        </NotificationProvider>
       </AuthProvider>
     </Router>
   );

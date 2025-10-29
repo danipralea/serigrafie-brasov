@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
@@ -6,7 +6,7 @@ import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import { sendTeamInvitationEmail, createInvitationLink } from '../services/emailService';
 import { TeamRole } from '../types';
 
-export default function InviteTeamModal({ isOpen, onClose }) {
+export default function InviteTeamModal({ isOpen, onClose, onInvitationCreated, existingEmails = [] }) {
   const { currentUser } = useAuth();
   const { t } = useTranslation();
   const [email, setEmail] = useState('');
@@ -15,6 +15,20 @@ export default function InviteTeamModal({ isOpen, onClose }) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [invitationLink, setInvitationLink] = useState('');
+
+  // Handle Escape key to close modal
+  useEffect(() => {
+    function handleEscapeKey(event) {
+      if (event.key === 'Escape' && isOpen) {
+        handleClose();
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscapeKey);
+      return () => document.removeEventListener('keydown', handleEscapeKey);
+    }
+  }, [isOpen]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -28,6 +42,13 @@ export default function InviteTeamModal({ isOpen, onClose }) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       setError(t('team.inviteModal.errorInvalidEmail'));
+      return;
+    }
+
+    // Check for duplicate email
+    const normalizedEmail = email.toLowerCase();
+    if (existingEmails.map(e => e.toLowerCase()).includes(normalizedEmail)) {
+      setError(t('team.inviteModal.errorDuplicateEmail'));
       return;
     }
 
@@ -72,6 +93,11 @@ export default function InviteTeamModal({ isOpen, onClose }) {
       // Reset form
       setEmail('');
       setRole(TeamRole.MEMBER);
+
+      // Notify parent to refresh
+      if (onInvitationCreated) {
+        onInvitationCreated();
+      }
     } catch (err) {
       console.error('Error creating invitation:', err);
       setError(t('team.inviteModal.errorFailed'));
@@ -91,7 +117,6 @@ export default function InviteTeamModal({ isOpen, onClose }) {
 
   function copyToClipboard() {
     navigator.clipboard.writeText(invitationLink);
-    alert(t('team.inviteModal.copyButton') + '!');
   }
 
   if (!isOpen) return null;

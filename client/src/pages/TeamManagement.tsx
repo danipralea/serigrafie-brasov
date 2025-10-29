@@ -6,7 +6,8 @@ import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { TeamRole } from '../types';
 import InviteTeamModal from '../components/InviteTeamModal';
-import Navigation from '../components/Navigation';
+import ConfirmDialog from '../components/ConfirmDialog';
+import AppShell from '../components/AppShell';
 
 export default function TeamManagement() {
   const { currentUser, userProfile } = useAuth();
@@ -16,6 +17,10 @@ export default function TeamManagement() {
   const [pendingInvitations, setPendingInvitations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showRemoveDialog, setShowRemoveDialog] = useState(false);
+  const [selectedInvitationId, setSelectedInvitationId] = useState(null);
+  const [selectedMemberId, setSelectedMemberId] = useState(null);
 
   useEffect(() => {
     fetchTeamData();
@@ -32,14 +37,16 @@ export default function TeamManagement() {
       const invitationsQuery = query(
         invitationsRef,
         where('teamOwnerId', '==', currentUser.uid),
-        where('status', '==', 'pending'),
-        orderBy('createdAt', 'desc')
+        where('status', '==', 'pending')
       );
       const invitationsSnapshot = await getDocs(invitationsQuery);
       const invitations = invitationsSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      })).sort((a, b) => {
+        // Sort by createdAt desc manually
+        return b.createdAt?.toMillis() - a.createdAt?.toMillis();
+      });
       setPendingInvitations(invitations);
 
       // Fetch accepted team members (you would need a teamMembers collection for this)
@@ -47,14 +54,16 @@ export default function TeamManagement() {
       const acceptedQuery = query(
         invitationsRef,
         where('teamOwnerId', '==', currentUser.uid),
-        where('status', '==', 'accepted'),
-        orderBy('acceptedAt', 'desc')
+        where('status', '==', 'accepted')
       );
       const acceptedSnapshot = await getDocs(acceptedQuery);
       const members = acceptedSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      })).sort((a, b) => {
+        // Sort by acceptedAt desc manually
+        return b.acceptedAt?.toMillis() - a.acceptedAt?.toMillis();
+      });
       setTeamMembers(members);
     } catch (error) {
       console.error('Error fetching team data:', error);
@@ -63,25 +72,38 @@ export default function TeamManagement() {
     }
   }
 
-  async function handleCancelInvitation(invitationId) {
-    if (!confirm('Are you sure you want to cancel this invitation?')) return;
+  function promptCancelInvitation(invitationId) {
+    setSelectedInvitationId(invitationId);
+    setShowCancelDialog(true);
+  }
+
+  async function handleCancelInvitation() {
+    if (!selectedInvitationId) return;
 
     try {
-      const invitationRef = doc(db, 'teamInvitations', invitationId);
+      const invitationRef = doc(db, 'teamInvitations', selectedInvitationId);
       await deleteDoc(invitationRef);
       await fetchTeamData();
     } catch (error) {
       console.error('Error canceling invitation:', error);
-      alert('Failed to cancel invitation');
+      alert(t('team.dialogs.cancelInvitationError'));
+    } finally {
+      setShowCancelDialog(false);
+      setSelectedInvitationId(null);
     }
   }
 
-  async function handleRemoveMember(memberId) {
-    if (!confirm('Are you sure you want to remove this team member?')) return;
+  function promptRemoveMember(memberId) {
+    setSelectedMemberId(memberId);
+    setShowRemoveDialog(true);
+  }
+
+  async function handleRemoveMember() {
+    if (!selectedMemberId) return;
 
     try {
       // Update invitation status to removed
-      const invitationRef = doc(db, 'teamInvitations', memberId);
+      const invitationRef = doc(db, 'teamInvitations', selectedMemberId);
       await updateDoc(invitationRef, {
         status: 'removed',
         removedAt: new Date()
@@ -89,7 +111,10 @@ export default function TeamManagement() {
       await fetchTeamData();
     } catch (error) {
       console.error('Error removing member:', error);
-      alert('Failed to remove team member');
+      alert(t('team.dialogs.removeMemberError'));
+    } finally {
+      setShowRemoveDialog(false);
+      setSelectedMemberId(null);
     }
   }
 
@@ -107,12 +132,8 @@ export default function TeamManagement() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-900 transition-colors">
-      {/* Navigation Bar */}
-      <Navigation variant="authenticated" />
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <AppShell title={t('team.title')}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex justify-between items-center mb-8">
           <div>
             <h2 className="text-3xl font-bold text-gray-900 dark:text-white">{t('team.title')}</h2>
@@ -189,7 +210,7 @@ export default function TeamManagement() {
                             {member.role === TeamRole.ADMIN ? t('team.admin') : t('team.member')}
                           </span>
                           <button
-                            onClick={() => handleRemoveMember(member.id)}
+                            onClick={() => promptRemoveMember(member.id)}
                             className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm font-medium transition-colors"
                           >
                             {t('team.remove')}
@@ -237,7 +258,7 @@ export default function TeamManagement() {
                             {invitation.role === TeamRole.ADMIN ? t('team.admin') : t('team.member')}
                           </span>
                           <button
-                            onClick={() => handleCancelInvitation(invitation.id)}
+                            onClick={() => promptCancelInvitation(invitation.id)}
                             className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm font-medium transition-colors"
                           >
                             {t('team.cancel')}
@@ -251,7 +272,6 @@ export default function TeamManagement() {
             </div>
           </div>
         )}
-      </main>
 
       {/* Invite Team Modal */}
       <InviteTeamModal
@@ -260,7 +280,40 @@ export default function TeamManagement() {
           setShowInviteModal(false);
           fetchTeamData(); // Refresh data after closing modal
         }}
+        onInvitationCreated={fetchTeamData}
+        existingEmails={[...teamMembers.map(m => m.email), ...pendingInvitations.map(i => i.email)]}
       />
-    </div>
+
+      {/* Cancel Invitation Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={showCancelDialog}
+        onClose={() => {
+          setShowCancelDialog(false);
+          setSelectedInvitationId(null);
+        }}
+        onConfirm={handleCancelInvitation}
+        title={t('team.dialogs.cancelInvitationTitle')}
+        message={t('team.dialogs.cancelInvitationMessage')}
+        confirmText={t('team.dialogs.cancelInvitationConfirm')}
+        cancelText={t('team.dialogs.cancelInvitationCancel')}
+        type="danger"
+      />
+
+      {/* Remove Member Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={showRemoveDialog}
+        onClose={() => {
+          setShowRemoveDialog(false);
+          setSelectedMemberId(null);
+        }}
+        onConfirm={handleRemoveMember}
+        title={t('team.dialogs.removeMemberTitle')}
+        message={t('team.dialogs.removeMemberMessage')}
+        confirmText={t('team.dialogs.removeMemberConfirm')}
+        cancelText={t('team.dialogs.removeMemberCancel')}
+        type="danger"
+      />
+      </div>
+    </AppShell>
   );
 }

@@ -1,0 +1,31 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Helper function to check if user is admin or team member
+    function isTeamMemberOrAdmin() {
+      return request.auth != null && (
+        get(/databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin == true ||
+        get(/databases/(default)/documents/users/$(request.auth.uid)).data.isTeamMember == true
+      );
+    }
+
+    // Profile pictures - users can only manage their own
+    match /profilePictures/{userId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Order attachments - team members and admins have full access
+    match /orderAttachments/{orderId}/{allPaths=**} {
+      allow read, write: if isTeamMemberOrAdmin();
+
+      // Order owners can read their own order attachments
+      allow read: if request.auth != null &&
+        get(/databases/(default)/documents/orders/$(orderId)).data.userId == request.auth.uid;
+
+      // Order owners can write to their own order attachments
+      allow write: if request.auth != null &&
+        get(/databases/(default)/documents/orders/$(orderId)).data.userId == request.auth.uid;
+    }
+  }
+}

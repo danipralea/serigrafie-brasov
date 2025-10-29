@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
@@ -6,10 +6,10 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
 import { showSuccess, showError } from '../services/notificationService';
-import Navigation from '../components/Navigation';
+import AppShell from '../components/AppShell';
 
 export default function Profile() {
-  const { currentUser, userProfile } = useAuth();
+  const { currentUser, userProfile, refreshUserProfile } = useAuth();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [displayName, setDisplayName] = useState(userProfile?.displayName || '');
@@ -17,6 +17,25 @@ export default function Profile() {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Track original values to detect changes
+  const [originalDisplayName, setOriginalDisplayName] = useState(userProfile?.displayName || '');
+  const [originalPhotoURL, setOriginalPhotoURL] = useState(userProfile?.photoURL || '');
+
+  // Sync local state with userProfile changes
+  useEffect(() => {
+    if (userProfile?.displayName) {
+      setDisplayName(userProfile.displayName);
+      setOriginalDisplayName(userProfile.displayName);
+    }
+    if (userProfile?.photoURL) {
+      setPhotoURL(userProfile.photoURL);
+      setOriginalPhotoURL(userProfile.photoURL);
+    }
+  }, [userProfile]);
+
+  // Check if there are any changes
+  const hasChanges = displayName !== originalDisplayName || photoURL !== originalPhotoURL;
 
   async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -49,7 +68,16 @@ export default function Profile() {
       });
 
       setPhotoURL(downloadURL);
+
+      // Refresh the user profile in AuthContext so navigation bar updates
+      await refreshUserProfile();
+
       showSuccess(t('profile.pictureSuccess'));
+
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     } catch (error) {
       console.error('Error uploading photo:', error);
       showError(t('profile.pictureError'));
@@ -84,6 +112,14 @@ export default function Profile() {
         displayName,
         photoURL
       });
+
+      // Refresh the user profile in AuthContext so navigation bar updates
+      await refreshUserProfile();
+
+      // Update original values after successful save
+      setOriginalDisplayName(displayName);
+      setOriginalPhotoURL(photoURL);
+
       showSuccess(t('profile.updateSuccess'));
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -94,14 +130,10 @@ export default function Profile() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors">
-      <Navigation variant="authenticated" />
-
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
+    <AppShell title={t('profile.title')}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="max-w-2xl">
-          <h2 className="text-base/7 font-semibold text-slate-900 dark:text-white transition-colors">
-            {t('profile.title')}
-          </h2>
+
           <p className="mt-1 text-sm/6 text-slate-600 dark:text-slate-300 transition-colors">
             {t('profile.subtitle')}
           </p>
@@ -210,17 +242,10 @@ export default function Profile() {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center justify-end gap-x-6">
-              <button
-                type="button"
-                onClick={() => navigate('/dashboard')}
-                className="text-sm font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
-              >
-                {t('profile.cancel')}
-              </button>
+            <div className="flex items-center justify-end">
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !hasChanges}
                 className="inline-flex justify-center rounded-md bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
               >
                 {loading ? t('profile.saving') : t('profile.save')}
@@ -228,7 +253,7 @@ export default function Profile() {
             </div>
           </form>
         </div>
-      </main>
-    </div>
+      </div>
+    </AppShell>
   );
 }

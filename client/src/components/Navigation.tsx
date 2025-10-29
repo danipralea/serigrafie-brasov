@@ -116,22 +116,30 @@ export default function Navigation({ variant = 'landing', onInviteTeam }: Naviga
             {/* Authenticated Navigation Items */}
             {variant === 'authenticated' && currentUser && (
               <>
-                {/* Only show Place Order button for regular clients (not admins or team members) */}
-                {!userProfile?.isAdmin && !userProfile?.isTeamMember && (
-                  <button
-                    onClick={() => navigate('/place-order')}
-                    className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-cyan-500 rounded-lg shadow-sm hover:opacity-90 transition-opacity"
-                  >
-                    {t('nav.placeOrder')}
-                  </button>
-                )}
-                {userProfile?.isAdmin && (
-                  <button
-                    onClick={() => navigate('/team')}
-                    className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500 rounded-lg transition-all hover:shadow-md"
-                  >
-                    {t('nav.team')}
-                  </button>
+                {/* Show Place Order button for all users (clients and team members) */}
+                <button
+                  onClick={() => navigate('/place-order')}
+                  className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-cyan-500 rounded-lg shadow-sm hover:opacity-90 transition-opacity"
+                >
+                  {t('nav.placeOrder')}
+                </button>
+                {(userProfile?.isAdmin || userProfile?.isTeamMember) && (
+                  <>
+                    <button
+                      onClick={() => navigate('/clients')}
+                      className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500 rounded-lg transition-all hover:shadow-md"
+                    >
+                      {t('nav.clients')}
+                    </button>
+                    {userProfile?.isAdmin && (
+                      <button
+                        onClick={() => navigate('/team')}
+                        className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500 rounded-lg transition-all hover:shadow-md"
+                      >
+                        {t('nav.team')}
+                      </button>
+                    )}
+                  </>
                 )}
               </>
             )}

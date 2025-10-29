@@ -34,9 +34,20 @@ export default function AuthModal({ isOpen, onClose, onSuccess }) {
       setLoading(true);
       await loginWithGoogle();
       onSuccess();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Google sign in error:', err);
-      setError('Failed to sign in with Google');
+
+      // Handle specific error cases
+      if (err.code === 'auth/popup-closed-by-user') {
+        // User closed the popup - don't show error, just reset loading
+        console.log('User cancelled Google login');
+      } else if (err.code === 'auth/cancelled-popup-request') {
+        // Multiple popups opened - don't show error
+        console.log('Popup request cancelled');
+      } else {
+        // Show error for actual failures
+        setError('Failed to sign in with Google');
+      }
     } finally {
       setLoading(false);
     }

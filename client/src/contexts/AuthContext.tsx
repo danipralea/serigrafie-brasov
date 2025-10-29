@@ -44,12 +44,25 @@ export function AuthProvider({ children }) {
         const userDoc = await getDoc(userDocRef);
 
         if (userDoc.exists()) {
-          setUserProfile(userDoc.data());
+          const existingProfile = userDoc.data();
+
+          // Update profile if phone number is missing but user has one
+          if (user.phoneNumber && !existingProfile.phoneNumber) {
+            const updatedProfile = {
+              ...existingProfile,
+              phoneNumber: user.phoneNumber
+            };
+            await setDoc(userDocRef, updatedProfile, { merge: true });
+            setUserProfile(updatedProfile);
+          } else {
+            setUserProfile(existingProfile);
+          }
         } else {
           // Create new user profile
           const newProfile = {
             email: user.email,
-            displayName: user.displayName || user.email,
+            phoneNumber: user.phoneNumber,
+            displayName: user.displayName || user.email || user.phoneNumber,
             isTeamMember: false,
             isAdmin: false,
             createdAt: new Date()
@@ -86,11 +99,29 @@ export function AuthProvider({ children }) {
 
   function setupRecaptcha(containerId: string) {
     if (!window.recaptchaVerifier) {
+      const container = document.getElementById(containerId);
+      if (!container) {
+        console.error('reCAPTCHA container not found:', containerId);
+        return null;
+      }
+
       window.recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
-        size: 'invisible',
+        size: 'normal',
         callback: () => {
-          // reCAPTCHA solved
+          // reCAPTCHA solved - user verified
+          console.log('reCAPTCHA verified');
+        },
+        'expired-callback': () => {
+          // Response expired. Ask user to solve reCAPTCHA again.
+          console.log('reCAPTCHA expired');
         }
+      });
+
+      // Render immediately
+      window.recaptchaVerifier.render().then((widgetId) => {
+        console.log('reCAPTCHA rendered with widget ID:', widgetId);
+      }).catch((error) => {
+        console.error('Error rendering reCAPTCHA:', error);
       });
     }
     return window.recaptchaVerifier;
@@ -98,7 +129,20 @@ export function AuthProvider({ children }) {
 
   async function loginWithPhone(phoneNumber: string) {
     const recaptchaVerifier = setupRecaptcha('recaptcha-container');
+    if (!recaptchaVerifier) {
+      throw new Error('reCAPTCHA verification failed to initialize');
+    }
     return signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
+  }
+
+  async function refreshUserProfile() {
+    if (currentUser) {
+      const userDocRef = doc(db, 'users', currentUser.uid);
+      const userDoc = await getDoc(userDocRef);
+      if (userDoc.exists()) {
+        setUserProfile(userDoc.data());
+      }
+    }
   }
 
   const value = {
@@ -109,7 +153,8 @@ export function AuthProvider({ children }) {
     logout,
     sendPasswordResetEmail,
     setupRecaptcha,
-    loginWithPhone
+    loginWithPhone,
+    refreshUserProfile
   };
 
   return (

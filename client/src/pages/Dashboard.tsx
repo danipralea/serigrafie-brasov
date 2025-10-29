@@ -7,9 +7,10 @@ import { collection, query, where, getDocs, orderBy as firestoreOrderBy, doc, up
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { OrderStatus, ProductType } from '../types';
 import InviteTeamModal from '../components/InviteTeamModal';
+import PlaceOrderModal from '../components/PlaceOrderModal';
 import Notifications from '../components/Notifications';
 import ConfirmDialog from '../components/ConfirmDialog';
-import Navigation from '../components/Navigation';
+import AppShell from '../components/AppShell';
 import { downloadInvoice, sendInvoiceToClient } from '../services/invoiceService';
 
 export default function Dashboard() {
@@ -20,6 +21,7 @@ export default function Dashboard() {
   const [filteredOrders, setFilteredOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showPlaceOrderModal, setShowPlaceOrderModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [updateText, setUpdateText] = useState('');
@@ -29,6 +31,7 @@ export default function Dashboard() {
   const [attachmentFile, setAttachmentFile] = useState(null);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const attachmentInputRef = useRef(null);
+  const updatesEndRef = useRef(null);
   const [sendingInvoice, setSendingInvoice] = useState(false);
 
   // Filter and sort states
@@ -47,6 +50,27 @@ export default function Dashboard() {
   useEffect(() => {
     applyFiltersAndSort();
   }, [orders, statusFilter, productFilter, sortBy, searchQuery]);
+
+  // Handle Escape key to close order details modal
+  useEffect(() => {
+    function handleEscapeKey(event) {
+      if (event.key === 'Escape' && selectedOrder) {
+        setSelectedOrder(null);
+      }
+    }
+
+    if (selectedOrder) {
+      document.addEventListener('keydown', handleEscapeKey);
+      return () => document.removeEventListener('keydown', handleEscapeKey);
+    }
+  }, [selectedOrder]);
+
+  // Auto-scroll to latest update
+  useEffect(() => {
+    if (orderUpdates.length > 0 && updatesEndRef.current) {
+      updatesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [orderUpdates]);
 
   async function fetchOrders() {
     if (!currentUser) return;
@@ -268,9 +292,9 @@ export default function Dashboard() {
       await addDoc(updatesRef, {
         orderId: selectedOrder.id,
         userId: currentUser.uid,
-        userName: 'System',
+        userName: t('dashboard.orderModal.system'),
         userEmail: currentUser.email,
-        text: `Order status changed to: ${newStatus}`,
+        text: `${t('dashboard.orderModal.statusChangedTo')} ${getStatusLabel(newStatus)}`,
         isSystem: true,
         createdAt: Timestamp.now()
       });
@@ -302,9 +326,9 @@ export default function Dashboard() {
       await addDoc(updatesRef, {
         orderId: selectedOrder.id,
         userId: currentUser.uid,
-        userName: 'System',
+        userName: t('dashboard.orderModal.system'),
         userEmail: currentUser.email,
-        text: `Comandă confirmată de client. Gata de procesare.`,
+        text: t('dashboard.orderModal.orderConfirmedByClient'),
         isSystem: true,
         createdAt: Timestamp.now()
       });
@@ -437,8 +461,6 @@ export default function Dashboard() {
         return t('dashboard.orderModal.statuses.confirmed');
       case OrderStatus.IN_PROGRESS:
         return t('dashboard.orderModal.statuses.inProduction');
-      case OrderStatus.READY_FOR_PICKUP:
-        return t('dashboard.orderModal.statuses.readyForPickup');
       case OrderStatus.COMPLETED:
         return t('dashboard.orderModal.statuses.completed');
       case OrderStatus.CANCELLED:
@@ -479,34 +501,33 @@ export default function Dashboard() {
   const stats = getOrderStats();
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors">
-      {/* Navigation Bar */}
-      <Navigation variant="authenticated" onInviteTeam={() => setShowInviteModal(true)} />
+    <AppShell title={t('dashboard.title')}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Stats Cards - Only for admins and team members */}
+        {(userProfile?.isAdmin || userProfile?.isTeamMember) && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-6 border border-slate-200 dark:border-slate-700 transition-colors">
+              <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{t('dashboard.stats.totalOrders')}</p>
+              <p className="text-3xl font-bold text-slate-900 dark:text-white">{stats.total}</p>
+            </div>
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-6 border border-slate-200 dark:border-slate-700 transition-colors">
+              <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{t('dashboard.stats.pending')}</p>
+              <p className="text-3xl font-bold text-yellow-600 dark:text-yellow-500">{stats.pending}</p>
+            </div>
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-6 border border-slate-200 dark:border-slate-700 transition-colors">
+              <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{t('dashboard.stats.inProgress')}</p>
+              <p className="text-3xl font-bold text-blue-600 dark:text-blue-500">{stats.in_progress}</p>
+            </div>
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-6 border border-slate-200 dark:border-slate-700 transition-colors">
+              <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{t('dashboard.stats.completed')}</p>
+              <p className="text-3xl font-bold text-green-600 dark:text-green-500">{stats.completed}</p>
+            </div>
+          </div>
+        )}
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-6 border border-slate-200 dark:border-slate-700 transition-colors">
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{t('dashboard.stats.totalOrders')}</p>
-            <p className="text-3xl font-bold text-slate-900 dark:text-white">{stats.total}</p>
-          </div>
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-6 border border-slate-200 dark:border-slate-700 transition-colors">
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{t('dashboard.stats.pending')}</p>
-            <p className="text-3xl font-bold text-yellow-600 dark:text-yellow-500">{stats.pending}</p>
-          </div>
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-6 border border-slate-200 dark:border-slate-700 transition-colors">
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{t('dashboard.stats.inProgress')}</p>
-            <p className="text-3xl font-bold text-blue-600 dark:text-blue-500">{stats.in_progress}</p>
-          </div>
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-6 border border-slate-200 dark:border-slate-700 transition-colors">
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{t('dashboard.stats.completed')}</p>
-            <p className="text-3xl font-bold text-green-600 dark:text-green-500">{stats.completed}</p>
-          </div>
-        </div>
-
-        {/* Filters and Search */}
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-6 mb-6 border border-slate-200 dark:border-slate-700 transition-colors">
+        {/* Filters and Search - Only for admins and team members */}
+        {(userProfile?.isAdmin || userProfile?.isTeamMember) && (
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-6 mb-6 border border-slate-200 dark:border-slate-700 transition-colors">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Search */}
             <div>
@@ -516,7 +537,7 @@ export default function Dashboard() {
                 placeholder={t('dashboard.filters.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                className="w-full h-10 px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
               />
             </div>
 
@@ -526,7 +547,7 @@ export default function Dashboard() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                className="w-full h-10 px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
               >
                 <option value="all">{t('dashboard.filters.allStatuses')}</option>
                 <option value={OrderStatus.PENDING}>{getStatusLabel(OrderStatus.PENDING)}</option>
@@ -542,7 +563,7 @@ export default function Dashboard() {
               <select
                 value={productFilter}
                 onChange={(e) => setProductFilter(e.target.value)}
-                className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                className="w-full h-10 px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
               >
                 <option value="all">{t('dashboard.filters.allProducts')}</option>
                 <option value={ProductType.MUGS}>{t('placeOrder.products.mugs')}</option>
@@ -560,7 +581,7 @@ export default function Dashboard() {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                className="w-full h-10 px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
               >
                 <option value="date-desc">{t('dashboard.filters.dateNewest')}</option>
                 <option value="date-asc">{t('dashboard.filters.dateOldest')}</option>
@@ -571,13 +592,24 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+        )}
 
         {/* Orders Table */}
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 transition-colors">
-          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
             <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
               {t('dashboard.table.yourOrders')} ({filteredOrders.length})
             </h2>
+            <button
+              onClick={() => setShowPlaceOrderModal(true)}
+              title={t('dashboard.addOrderTitle')}
+              className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-medium transition-opacity hover:opacity-90 flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              {t('dashboard.addOrder')}
+            </button>
           </div>
 
           {loading ? (
@@ -608,8 +640,8 @@ export default function Dashboard() {
               {orders.length === 0 && (
                 <div className="mt-6">
                   <button
-                    onClick={() => navigate('/place-order')}
-                    className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-gradient-to-r from-blue-600 to-cyan-500 hover:opacity-90 transition-opacity"
+                    onClick={() => setShowPlaceOrderModal(true)}
+                    className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-gradient-to-r from-blue-600 to-cyan-500 hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                   >
                     {t('nav.placeOrder')}
                   </button>
@@ -658,7 +690,7 @@ export default function Dashboard() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <button
                           onClick={() => openOrderDetails(order)}
-                          className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                          className="text-blue-600 dark:text-blue-400 hover:underline font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-800 rounded"
                         >
                           {t('dashboard.table.viewDetails')}
                         </button>
@@ -670,12 +702,17 @@ export default function Dashboard() {
             </div>
           )}
         </div>
-      </main>
 
       {/* Order Details Modal */}
       {showOrderModal && selectedOrder && (
-        <div className="fixed inset-0 bg-slate-900/75 dark:bg-black/80 flex items-center justify-center z-50 p-4 transition-colors">
-          <div className="relative bg-white dark:bg-slate-800 rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-slate-700 transition-colors">
+        <div
+          className="fixed inset-0 bg-slate-900/75 dark:bg-black/80 flex items-center justify-center z-50 p-4 transition-colors"
+          onClick={() => setShowOrderModal(false)}
+        >
+          <div
+            className="relative bg-white dark:bg-slate-800 rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-slate-700 transition-colors"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center sticky top-0 bg-white dark:bg-slate-800">
               <div>
@@ -859,7 +896,16 @@ export default function Dashboard() {
                     </p>
                   ) : (
                     <div className="space-y-3">
-                      {orderUpdates.map((update) => {
+                      {orderUpdates
+                        .filter((update) => {
+                          // Hide system messages (status updates) for clients
+                          const isClient = !userProfile?.isAdmin && !userProfile?.isTeamMember;
+                          if (isClient && update.isSystem) {
+                            return false;
+                          }
+                          return true;
+                        })
+                        .map((update) => {
                         const isOwnMessage = update.userId === currentUser?.uid;
                         const isSystemMessage = update.isSystem;
 
@@ -982,6 +1028,8 @@ export default function Dashboard() {
                           </div>
                         );
                       })}
+                      {/* Scroll anchor element */}
+                      <div ref={updatesEndRef} />
                     </div>
                   )}
                 </div>
@@ -1082,6 +1130,17 @@ export default function Dashboard() {
           inline={true}
         />
       )}
-    </div>
+
+      {/* Place Order Modal */}
+      <PlaceOrderModal
+        open={showPlaceOrderModal}
+        onClose={() => setShowPlaceOrderModal(false)}
+        onSuccess={() => {
+          setShowPlaceOrderModal(false);
+          fetchOrders(); // Refresh orders list
+        }}
+      />
+      </div>
+    </AppShell>
   );
 }

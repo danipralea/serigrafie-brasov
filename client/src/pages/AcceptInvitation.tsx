@@ -91,9 +91,20 @@ export default function AcceptInvitation() {
       setTimeout(() => {
         navigate('/dashboard');
       }, 2000);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error accepting invitation:', err);
-      setError('Failed to accept invitation');
+
+      // Handle specific error cases
+      if (err.code === 'auth/popup-closed-by-user') {
+        // User closed the popup - don't show error, just reset loading
+        console.log('User cancelled Google login');
+      } else if (err.code === 'auth/cancelled-popup-request') {
+        // Multiple popups opened - don't show error
+        console.log('Popup request cancelled');
+      } else {
+        // Show error for actual failures
+        setError('Failed to accept invitation');
+      }
     } finally {
       setAccepting(false);
     }

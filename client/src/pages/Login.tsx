@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
+import PhoneAuthModal from '../components/PhoneAuthModal';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -9,7 +10,9 @@ export default function Login() {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
+  const [showPhoneAuth, setShowPhoneAuth] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetSuccess, setResetSuccess] = useState(false);
   const { login, loginWithGoogle, sendPasswordResetEmail } = useAuth();
@@ -66,14 +69,25 @@ export default function Login() {
   async function handleGoogleLogin() {
     try {
       setError('');
-      setLoading(true);
+      setGoogleLoading(true);
       await loginWithGoogle();
       navigate('/dashboard');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Google login error:', err);
-      setError(t('login.errorGoogleLogin'));
+
+      // Handle specific error cases
+      if (err.code === 'auth/popup-closed-by-user') {
+        // User closed the popup - don't show error, just reset loading
+        console.log('User cancelled Google login');
+      } else if (err.code === 'auth/cancelled-popup-request') {
+        // Multiple popups opened - don't show error
+        console.log('Popup request cancelled');
+      } else {
+        // Show error for actual failures
+        setError(t('login.errorGoogleLogin'));
+      }
     } finally {
-      setLoading(false);
+      setGoogleLoading(false);
     }
   }
 
@@ -314,6 +328,7 @@ export default function Login() {
 
               <button
                 type="button"
+                onClick={() => setShowPhoneAuth(true)}
                 disabled={loading}
                 className="flex w-full items-center justify-center gap-3 rounded-md bg-white dark:bg-slate-700 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-white shadow-xs ring-1 ring-inset ring-gray-300 dark:ring-slate-600 hover:bg-gray-50 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -323,10 +338,25 @@ export default function Login() {
                 <span className="text-sm/6 font-semibold">{t('login.phone')}</span>
               </button>
             </div>
+
+            {/* Google Loading Message */}
+            {googleLoading && (
+              <div className="mt-4 flex items-center justify-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 dark:border-blue-400"></div>
+                <span>{t('login.waitingForGoogle')}</span>
+              </div>
+            )}
           </div>
           </>
           )}
         </div>
+
+        {/* Phone Auth Modal */}
+        <PhoneAuthModal
+          open={showPhoneAuth}
+          onClose={() => setShowPhoneAuth(false)}
+          onSuccess={() => navigate('/dashboard')}
+        />
 
         {!showResetPassword && (
           <p className="mt-10 text-center text-sm/6 text-gray-500 dark:text-slate-400">
