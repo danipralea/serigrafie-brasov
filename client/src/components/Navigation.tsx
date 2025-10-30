@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
+import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react';
+import { GlobeAltIcon, SunIcon, MoonIcon, ComputerDesktopIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 
 interface NavigationProps {
   variant?: 'landing' | 'authenticated';
@@ -16,9 +18,6 @@ export default function Navigation({ variant = 'landing', onInviteTeam }: Naviga
     const saved = localStorage.getItem('themeMode');
     return (saved as 'light' | 'dark' | 'system') || 'system';
   });
-  const [langMenuOpen, setLangMenuOpen] = useState(false);
-  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   // Apply dark mode based on theme preference
   useEffect(() => {
@@ -53,30 +52,19 @@ export default function Navigation({ variant = 'landing', onInviteTeam }: Naviga
     }
   }, [themeMode]);
 
-  // Close dropdowns when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      if (!target.closest('.language-dropdown') && !target.closest('.theme-dropdown') && !target.closest('.user-menu')) {
-        setLangMenuOpen(false);
-        setThemeMenuOpen(false);
-        setUserMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, []);
-
-  const changeTheme = (mode: 'light' | 'dark' | 'system') => {
-    setThemeMode(mode);
-    setThemeMenuOpen(false);
+  const themeIcons = {
+    light: SunIcon,
+    dark: MoonIcon,
+    system: ComputerDesktopIcon,
   };
 
-  const changeLanguage = (lang: string) => {
-    i18n.changeLanguage(lang);
-    setLangMenuOpen(false);
+  const themeLabels = {
+    light: 'Luminos',
+    dark: 'Întunecat',
+    system: 'Sistem',
   };
+
+  const ThemeIcon = themeIcons[themeMode];
 
   function getInitials(name, email) {
     if (name && name.trim()) {
@@ -145,170 +133,123 @@ export default function Navigation({ variant = 'landing', onInviteTeam }: Naviga
             )}
 
             {/* Language Switcher */}
-            <div className="relative language-dropdown">
-              <button
-                onClick={() => {
-                  setLangMenuOpen(!langMenuOpen);
-                  setThemeMenuOpen(false);
-                  setUserMenuOpen(false);
-                }}
-                className="px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500 rounded-lg transition-all hover:shadow-md flex items-center"
-                aria-label="Select language"
+            <Menu as="div" className="relative inline-block">
+              <MenuButton className="flex items-center px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500 rounded-lg transition-all hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:focus-visible:outline-blue-500">
+                <span className="sr-only">Select language</span>
+                <GlobeAltIcon aria-hidden="true" className="size-5" />
+              </MenuButton>
+              <MenuItems
+                transition
+                className="absolute right-0 z-10 mt-2 w-36 origin-top-right rounded-md bg-white shadow-lg outline-1 outline-black/5 transition data-closed:scale-95 data-closed:transform data-closed:opacity-0 data-enter:duration-100 data-enter:ease-out data-leave:duration-75 data-leave:ease-in dark:bg-slate-800 dark:shadow-none dark:-outline-offset-1 dark:outline-white/10"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-                </svg>
-              </button>
-
-              {langMenuOpen && (
-                <div className="absolute right-0 mt-2 w-32 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg overflow-hidden">
-                  <button
-                    onClick={() => changeLanguage('ro')}
-                    className={`w-full px-4 py-2 text-left text-sm transition-colors ${
-                      i18n.language === 'ro'
-                        ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold'
-                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                    }`}
-                  >
-                    Română
-                  </button>
-                  <button
-                    onClick={() => changeLanguage('en')}
-                    className={`w-full px-4 py-2 text-left text-sm transition-colors ${
-                      i18n.language === 'en'
-                        ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold'
-                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                    }`}
-                  >
-                    English
-                  </button>
+                <div className="py-1">
+                  <MenuItem>
+                    <button
+                      onClick={() => i18n.changeLanguage('ro')}
+                      className={`w-full text-left block px-4 py-2 text-sm data-focus:bg-slate-100 data-focus:text-slate-900 data-focus:outline-hidden dark:data-focus:bg-white/5 dark:data-focus:text-white ${
+                        i18n.language === 'ro'
+                          ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold'
+                          : 'text-slate-700 dark:text-slate-300'
+                      }`}
+                    >
+                      Română
+                    </button>
+                  </MenuItem>
+                  <MenuItem>
+                    <button
+                      onClick={() => i18n.changeLanguage('en')}
+                      className={`w-full text-left block px-4 py-2 text-sm data-focus:bg-slate-100 data-focus:text-slate-900 data-focus:outline-hidden dark:data-focus:bg-white/5 dark:data-focus:text-white ${
+                        i18n.language === 'en'
+                          ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold'
+                          : 'text-slate-700 dark:text-slate-300'
+                      }`}
+                    >
+                      English
+                    </button>
+                  </MenuItem>
                 </div>
-              )}
-            </div>
+              </MenuItems>
+            </Menu>
 
             {/* Theme Selector */}
-            <div className="relative theme-dropdown">
-              <button
-                onClick={() => {
-                  setThemeMenuOpen(!themeMenuOpen);
-                  setLangMenuOpen(false);
-                  setUserMenuOpen(false);
-                }}
-                className="px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500 rounded-lg transition-all hover:shadow-md flex items-center gap-2"
-                aria-label="Select theme"
+            <Menu as="div" className="relative inline-block">
+              <MenuButton className="flex items-center px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500 rounded-lg transition-all hover:shadow-md gap-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:focus-visible:outline-blue-500">
+                <span className="sr-only">Select theme</span>
+                <ThemeIcon aria-hidden="true" className="size-5" />
+                <ChevronDownIcon aria-hidden="true" className="size-4" />
+              </MenuButton>
+              <MenuItems
+                transition
+                className="absolute right-0 z-10 mt-2 w-40 origin-top-right rounded-md bg-white shadow-lg outline-1 outline-black/5 transition data-closed:scale-95 data-closed:transform data-closed:opacity-0 data-enter:duration-100 data-enter:ease-out data-leave:duration-75 data-leave:ease-in dark:bg-slate-800 dark:shadow-none dark:-outline-offset-1 dark:outline-white/10"
               >
-                {themeMode === 'light' ? (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                  </svg>
-                ) : themeMode === 'dark' ? (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                  </svg>
-                ) : (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                )}
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-
-              {themeMenuOpen && (
-                <div className="absolute right-0 mt-2 w-40 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg overflow-hidden">
-                  <button
-                    onClick={() => changeTheme('light')}
-                    className={`w-full px-4 py-2 text-left text-sm transition-colors flex items-center gap-2 ${
-                      themeMode === 'light'
-                        ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold'
-                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                    }`}
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                    </svg>
-                    Luminos
-                  </button>
-                  <button
-                    onClick={() => changeTheme('dark')}
-                    className={`w-full px-4 py-2 text-left text-sm transition-colors flex items-center gap-2 ${
-                      themeMode === 'dark'
-                        ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold'
-                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                    }`}
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                    </svg>
-                    Întunecat
-                  </button>
-                  <button
-                    onClick={() => changeTheme('system')}
-                    className={`w-full px-4 py-2 text-left text-sm transition-colors flex items-center gap-2 ${
-                      themeMode === 'system'
-                        ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold'
-                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-                    }`}
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                    Sistem
-                  </button>
+                <div className="py-1">
+                  {(['light', 'dark', 'system'] as const).map((theme) => {
+                    const Icon = themeIcons[theme];
+                    return (
+                      <MenuItem key={theme}>
+                        <button
+                          onClick={() => setThemeMode(theme)}
+                          className={`w-full text-left block px-4 py-2 text-sm data-focus:bg-slate-100 data-focus:text-slate-900 data-focus:outline-hidden dark:data-focus:bg-white/5 dark:data-focus:text-white flex items-center gap-2 ${
+                            themeMode === theme
+                              ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold'
+                              : 'text-slate-700 dark:text-slate-300'
+                          }`}
+                        >
+                          <Icon className="size-4" />
+                          {themeLabels[theme]}
+                        </button>
+                      </MenuItem>
+                    );
+                  })}
                 </div>
-              )}
-            </div>
+              </MenuItems>
+            </Menu>
 
             {/* User Menu (only for authenticated variant) */}
             {variant === 'authenticated' && currentUser && (
-              <div className="relative user-menu">
-                <button
-                  onClick={() => {
-                    setUserMenuOpen(!userMenuOpen);
-                    setLangMenuOpen(false);
-                    setThemeMenuOpen(false);
-                  }}
-                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
-                >
+              <Menu as="div" className="relative inline-block">
+                <MenuButton className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:focus-visible:outline-blue-500">
+                  <span className="sr-only">Open user menu</span>
                   {/* Profile Picture or Initials */}
                   {userProfile?.photoURL ? (
                     <img
                       src={userProfile.photoURL}
                       alt="Profile"
-                      className="w-8 h-8 rounded-full object-cover border-2 border-slate-200 dark:border-slate-600"
+                      className="size-8 rounded-full object-cover outline -outline-offset-1 outline-slate-200 dark:outline-slate-600"
                     />
                   ) : (
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white text-xs font-bold border-2 border-slate-200 dark:border-slate-600">
+                    <div className="size-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white text-xs font-bold outline -outline-offset-1 outline-slate-200 dark:outline-slate-600">
                       {getInitials(userProfile?.displayName || currentUser.displayName, currentUser.email)}
                     </div>
                   )}
                   <span>{userProfile?.displayName || currentUser.displayName || currentUser.email}</span>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
+                  <ChevronDownIcon aria-hidden="true" className="size-4" />
+                </MenuButton>
 
-                {userMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg overflow-hidden">
-                    <button
-                      onClick={() => {
-                        navigate('/profile');
-                        setUserMenuOpen(false);
-                      }}
-                      className="w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                    >
-                      {t('nav.profile')}
-                    </button>
-                    <button
-                      onClick={handleLogout}
-                      className="w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                    >
-                      {t('nav.signOut')}
-                    </button>
+                <MenuItems
+                  transition
+                  className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white shadow-lg outline-1 outline-black/5 transition data-closed:scale-95 data-closed:transform data-closed:opacity-0 data-enter:duration-100 data-enter:ease-out data-leave:duration-75 data-leave:ease-in dark:bg-slate-800 dark:shadow-none dark:-outline-offset-1 dark:outline-white/10"
+                >
+                  <div className="py-1">
+                    <MenuItem>
+                      <button
+                        onClick={() => navigate('/profile')}
+                        className="w-full text-left block px-4 py-2 text-sm text-slate-700 data-focus:bg-slate-100 data-focus:text-slate-900 data-focus:outline-hidden dark:text-slate-300 dark:data-focus:bg-white/5 dark:data-focus:text-white"
+                      >
+                        {t('nav.profile')}
+                      </button>
+                    </MenuItem>
+                    <MenuItem>
+                      <button
+                        onClick={handleLogout}
+                        className="w-full text-left block px-4 py-2 text-sm text-slate-700 data-focus:bg-slate-100 data-focus:text-slate-900 data-focus:outline-hidden dark:text-slate-300 dark:data-focus:bg-white/5 dark:data-focus:text-white"
+                      >
+                        {t('nav.signOut')}
+                      </button>
+                    </MenuItem>
                   </div>
-                )}
-              </div>
+                </MenuItems>
+              </Menu>
             )}
 
             {/* Login Button (only for landing variant) */}

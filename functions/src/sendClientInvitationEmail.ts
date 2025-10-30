@@ -1,43 +1,16 @@
 /**
- * Firebase Cloud Function to send team invitation emails using Nodemailer
- *
- * Setup Instructions:
- * 1. Initialize Firebase Functions with TypeScript (if not already done):
- *    firebase init functions
- *    (Select TypeScript when prompted)
- *
- * 2. Install dependencies in functions directory:
- *    cd functions
- *    npm install nodemailer
- *    npm install --save-dev @types/nodemailer
- *
- * 3. Set email credentials in Google Secret Manager:
- *    Create two secrets: EMAIL_USER and EMAIL_PASS
- *    - Via Google Cloud Console: https://console.cloud.google.com/security/secret-manager
- *    - Or via gcloud CLI:
- *      echo -n "your-email@gmail.com" | gcloud secrets create EMAIL_USER --data-file=-
- *      echo -n "your-app-password" | gcloud secrets create EMAIL_PASS --data-file=-
- *
- *    For Gmail app password: https://myaccount.google.com/apppasswords
- *
- * 4. Add this file to functions/src/index.ts:
- *    export * from './sendTeamInvitationEmail';
- *
- * 5. Deploy this function:
- *    firebase deploy --only functions:sendTeamInvitationEmail
- *
- * 6. The client/src/services/emailService.js already calls this function
+ * Firebase Cloud Function to send client invitation emails using Nodemailer
  */
 
 import * as functions from "firebase-functions";
 import {defineSecret} from "firebase-functions/params";
 import * as nodemailer from "nodemailer";
 
-interface InvitationEmailData {
+interface ClientInvitationEmailData {
   email: string;
+  clientName: string;
   inviterName: string;
   inviterEmail: string;
-  role: "owner" | "admin" | "member";
   invitationLink: string;
 }
 
@@ -47,11 +20,11 @@ const emailPass = defineSecret("EMAIL_PASS");
 
 const FROM_NAME = "Serigrafie Brasov";
 
-export const sendTeamInvitationEmail = functions
+export const sendClientInvitationEmail = functions
   .runWith({secrets: [emailUser, emailPass]})
   .https.onCall(
   async (
-    data: InvitationEmailData,
+    data: ClientInvitationEmailData,
     context: functions.https.CallableContext
   ) => {
     // Verify the user is authenticated
@@ -77,7 +50,7 @@ export const sendTeamInvitationEmail = functions
 
     // Create transporter with secret values
     const transporter = nodemailer.createTransport({
-      service: "gmail", // Change to 'outlook', 'yahoo', etc. if needed
+      service: "gmail",
       auth: {
         user: emailUserValue,
         pass: emailPassValue,
@@ -85,13 +58,13 @@ export const sendTeamInvitationEmail = functions
     });
 
     // Validate required fields
-    const {email, inviterName, inviterEmail, role, invitationLink} = data;
+    const {email, clientName, inviterName, inviterEmail, invitationLink} = data;
 
-    if (!email || !inviterName || !role || !invitationLink) {
+    if (!email || !inviterName || !invitationLink) {
       throw new functions.https.HttpsError(
         "invalid-argument",
         "Missing required fields: " +
-        "email, inviterName, role, or invitationLink"
+        "email, inviterName, or invitationLink"
       );
     }
 
@@ -104,21 +77,14 @@ export const sendTeamInvitationEmail = functions
       );
     }
 
-    // Role names mapping (Romanian)
-    const roleNames: Record<string, string> = {
-      owner: "Proprietar",
-      admin: "Administrator",
-      member: "Membru",
-    };
-
-    // HTML Email Template
+    // HTML Email Template (Romanian)
     const htmlContent = `
       <!DOCTYPE html>
       <html>
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Invitație în echipă</title>
+          <title>Invitație de comandă</title>
           <style>
             body {
               font-family: -apple-system, BlinkMacSystemFont,
@@ -148,16 +114,6 @@ export const sendTeamInvitationEmail = functions
             }
             .content {
               margin-bottom: 30px;
-            }
-            .role-badge {
-              display: inline-block;
-              padding: 6px 12px;
-              background: #0693e3;
-              color: white;
-              border-radius: 20px;
-              font-size: 14px;
-              font-weight: 600;
-              margin: 10px 0;
             }
             .button {
               display: inline-block;
@@ -196,24 +152,28 @@ export const sendTeamInvitationEmail = functions
             </div>
 
             <div class="content">
-              <h2>Ai fost invitat să te alături unei echipe!</h2>
+              <h2>Ai fost invitat să plasezi comenzi!</h2>
 
-              <p>Bună!</p>
+              <p>Bună${clientName ? ` ${clientName}` : ""}!</p>
 
               <p>
                 <strong>${inviterName}</strong>${
   inviterEmail ? ` (${inviterEmail})` : ""
-} te-a invitat să te alături echipei sale pe platforma de urmărire comenzi Serigrafie Brasov.
+} te-a invitat să folosești platforma noastră de comenzi personalizate.
               </p>
 
               <p>
-                Vei avea rolul de <span class="role-badge">${
-  roleNames[role] || role
-}</span>
+                Vei putea:
               </p>
+              <ul>
+                <li>Plasa comenzi pentru produse personalizate (căni, tricouri, hanorace, genți, șepci și altele)</li>
+                <li>Urmări statusul comenzilor tale în timp real</li>
+                <li>Comunica direct cu echipa noastră</li>
+                <li>Vizualiza istoricul comenzilor tale</li>
+              </ul>
 
               <div class="expires">
-                ⏱️ Această invitație expiră în 7 zile.
+                ⏱️ Această invitație expiră în 30 de zile.
               </div>
 
               <div style="text-align: center; margin: 30px 0;">
@@ -226,7 +186,7 @@ export const sendTeamInvitationEmail = functions
                           border-radius: 6px;
                           font-weight: 600;
                           font-size: 16px;">
-                  Acceptă invitația
+                  Crează cont și începe să comanzi
                 </a>
               </div>
 
@@ -255,18 +215,24 @@ export const sendTeamInvitationEmail = functions
 
     // Plain Text Email Template (Romanian)
     const textContent = `
-Ai fost invitat să te alături unei echipe la Serigrafie Brasov!
+Ai fost invitat să plasezi comenzi la Serigrafie Brasov!
+
+Bună${clientName ? ` ${clientName}` : ""}!
 
 ${inviterName}${
   inviterEmail ? ` (${inviterEmail})` : ""
-} te-a invitat să te alături echipei sale.
+} te-a invitat să folosești platforma noastră de comenzi personalizate.
 
-Rol: ${roleNames[role] || role}
+Vei putea:
+- Plasa comenzi pentru produse personalizate (căni, tricouri, hanorace, genți, șepci și altele)
+- Urmări statusul comenzilor tale în timp real
+- Comunica direct cu echipa noastră
+- Vizualiza istoricul comenzilor tale
 
 Dă click pe linkul de mai jos pentru a accepta invitația:
 ${invitationLink}
 
-Această invitație expiră în 7 zile.
+Această invitație expiră în 30 de zile.
 
 Dacă nu te așteptai la această invitație, poți ignora acest email în siguranță.
 
@@ -279,7 +245,7 @@ Dacă nu te așteptai la această invitație, poți ignora acest email în sigur
         from: `"${FROM_NAME}" <${emailUserValue}>`,
         to: email,
         subject:
-          `Invitație în echipa ${inviterName} - Serigrafie Brasov`,
+          `Invitație de comenzi de la ${inviterName} - Serigrafie Brasov`,
         text: textContent,
         html: htmlContent,
       };
@@ -287,8 +253,8 @@ Dacă nu te așteptai la această invitație, poți ignora acest email în sigur
       const info = await transporter.sendMail(mailOptions);
 
       functions.logger.info(
-        `Team invitation email sent successfully to ${email}`,
-        {messageId: info.messageId, inviterName, role}
+        `Client invitation email sent successfully to ${email}`,
+        {messageId: info.messageId, inviterName}
       );
 
       return {
@@ -299,7 +265,7 @@ Dacă nu te așteptai la această invitație, poți ignora acest email în sigur
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ?
         error.message : "Unknown error";
-      functions.logger.error("Error sending invitation email:", {
+      functions.logger.error("Error sending client invitation email:", {
         error: errorMessage,
         email,
         inviterName,

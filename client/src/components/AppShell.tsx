@@ -207,79 +207,83 @@ export default function AppShell({ children, title }: { children: React.ReactNod
             <div className="hidden md:block">
               <div className="ml-4 flex items-center md:ml-6 gap-2">
                 {/* Language Menu */}
-                <Menu as="div" className="relative">
-                  <MenuButton className="relative rounded-full p-2 text-slate-400 hover:text-white focus:outline-none transition-colors">
+                <Menu as="div" className="relative inline-block">
+                  <MenuButton className="flex items-center rounded-full p-2 text-slate-400 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:focus-visible:outline-blue-500 transition-colors">
                     <span className="sr-only">Select language</span>
                     <GlobeAltIcon aria-hidden="true" className="size-5" />
                   </MenuButton>
                   <MenuItems
                     transition
-                    className="absolute right-0 z-10 mt-2 w-36 origin-top-right rounded-md bg-white py-1 shadow-lg outline-1 outline-black/5 transition data-closed:scale-95 data-closed:transform data-closed:opacity-0 data-enter:duration-100 data-enter:ease-out data-leave:duration-75 data-leave:ease-in dark:bg-slate-800 dark:shadow-none dark:-outline-offset-1 dark:outline-white/10"
+                    className="absolute right-0 z-10 mt-2 w-36 origin-top-right rounded-md bg-white shadow-lg outline-1 outline-black/5 transition data-closed:scale-95 data-closed:transform data-closed:opacity-0 data-enter:duration-100 data-enter:ease-out data-leave:duration-75 data-leave:ease-in dark:bg-slate-800 dark:shadow-none dark:-outline-offset-1 dark:outline-white/10"
                   >
-                    <MenuItem>
-                      <button
-                        onClick={() => i18n.changeLanguage('ro')}
-                        className={classNames(
-                          i18n.language === 'ro'
-                            ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold'
-                            : 'text-slate-700 dark:text-slate-300',
-                          'w-full text-left px-4 py-2 text-sm data-focus:bg-slate-100 data-focus:outline-hidden dark:data-focus:bg-white/5 transition-colors'
-                        )}
-                      >
-                        Română
-                      </button>
-                    </MenuItem>
-                    <MenuItem>
-                      <button
-                        onClick={() => i18n.changeLanguage('en')}
-                        className={classNames(
-                          i18n.language === 'en'
-                            ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold'
-                            : 'text-slate-700 dark:text-slate-300',
-                          'w-full text-left px-4 py-2 text-sm data-focus:bg-slate-100 data-focus:outline-hidden dark:data-focus:bg-white/5 transition-colors'
-                        )}
-                      >
-                        English
-                      </button>
-                    </MenuItem>
+                    <div className="py-1">
+                      <MenuItem>
+                        <button
+                          onClick={() => i18n.changeLanguage('ro')}
+                          className={classNames(
+                            i18n.language === 'ro'
+                              ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold'
+                              : 'text-slate-700 dark:text-slate-300',
+                            'w-full text-left block px-4 py-2 text-sm data-focus:bg-slate-100 data-focus:text-slate-900 data-focus:outline-hidden dark:data-focus:bg-white/5 dark:data-focus:text-white'
+                          )}
+                        >
+                          Română
+                        </button>
+                      </MenuItem>
+                      <MenuItem>
+                        <button
+                          onClick={() => i18n.changeLanguage('en')}
+                          className={classNames(
+                            i18n.language === 'en'
+                              ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold'
+                              : 'text-slate-700 dark:text-slate-300',
+                            'w-full text-left block px-4 py-2 text-sm data-focus:bg-slate-100 data-focus:text-slate-900 data-focus:outline-hidden dark:data-focus:bg-white/5 dark:data-focus:text-white'
+                          )}
+                        >
+                          English
+                        </button>
+                      </MenuItem>
+                    </div>
                   </MenuItems>
                 </Menu>
 
                 {/* Theme Menu */}
-                <Menu as="div" className="relative">
-                  <MenuButton className="relative rounded-full p-2 text-slate-400 hover:text-white focus:outline-none transition-colors">
+                <Menu as="div" className="relative inline-block">
+                  <MenuButton className="flex items-center rounded-full p-2 text-slate-400 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:focus-visible:outline-blue-500 transition-colors">
                     <span className="sr-only">Select theme</span>
                     <ThemeIcon aria-hidden="true" className="size-5" />
                   </MenuButton>
                   <MenuItems
                     transition
-                    className="absolute right-0 z-10 mt-2 w-40 origin-top-right rounded-md bg-white py-1 shadow-lg outline-1 outline-black/5 transition data-closed:scale-95 data-closed:transform data-closed:opacity-0 data-enter:duration-100 data-enter:ease-out data-leave:duration-75 data-leave:ease-in dark:bg-slate-800 dark:shadow-none dark:-outline-offset-1 dark:outline-white/10"
+                    className="absolute right-0 z-10 mt-2 w-40 origin-top-right rounded-md bg-white shadow-lg outline-1 outline-black/5 transition data-closed:scale-95 data-closed:transform data-closed:opacity-0 data-enter:duration-100 data-enter:ease-out data-leave:duration-75 data-leave:ease-in dark:bg-slate-800 dark:shadow-none dark:-outline-offset-1 dark:outline-white/10"
                   >
-                    {(['light', 'dark', 'system'] as const).map((theme) => {
-                      const Icon = themeIcons[theme];
-                      return (
-                        <MenuItem key={theme}>
-                          <button
-                            onClick={() => setThemeMode(theme)}
-                            className={classNames(
-                              themeMode === theme
-                                ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold'
-                                : 'text-slate-700 dark:text-slate-300',
-                              'w-full text-left px-4 py-2 text-sm data-focus:bg-slate-100 data-focus:outline-hidden dark:data-focus:bg-white/5 transition-colors flex items-center gap-2'
-                            )}
-                          >
-                            <Icon className="size-4" />
-                            {themeLabels[theme]}
-                          </button>
-                        </MenuItem>
-                      );
-                    })}
+                    <div className="py-1">
+                      {(['light', 'dark', 'system'] as const).map((theme) => {
+                        const Icon = themeIcons[theme];
+                        return (
+                          <MenuItem key={theme}>
+                            <button
+                              onClick={() => setThemeMode(theme)}
+                              className={classNames(
+                                themeMode === theme
+                                  ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-semibold'
+                                  : 'text-slate-700 dark:text-slate-300',
+                                'w-full text-left block px-4 py-2 text-sm data-focus:bg-slate-100 data-focus:text-slate-900 data-focus:outline-hidden dark:data-focus:bg-white/5 dark:data-focus:text-white flex items-center gap-2'
+                              )}
+                            >
+                              <Icon className="size-4" />
+                              {themeLabels[theme]}
+                            </button>
+                          </MenuItem>
+                        );
+                      })}
+                    </div>
                   </MenuItems>
                 </Menu>
 
                 {/* Profile dropdown */}
-                <Menu as="div" className="relative ml-1">
-                  <MenuButton className="relative flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-white/5 focus:outline-none transition-colors">
+                <Menu as="div" className="relative inline-block ml-1">
+                  <MenuButton className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:focus-visible:outline-blue-500 transition-colors">
                     <span className="sr-only">Open user menu</span>
                     {userProfile?.photoURL ? (
                       <img
@@ -299,18 +303,20 @@ export default function AppShell({ children, title }: { children: React.ReactNod
 
                   <MenuItems
                     transition
-                    className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg outline-1 outline-black/5 transition data-closed:scale-95 data-closed:transform data-closed:opacity-0 data-enter:duration-100 data-enter:ease-out data-leave:duration-75 data-leave:ease-in dark:bg-slate-800 dark:shadow-none dark:-outline-offset-1 dark:outline-white/10"
+                    className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white shadow-lg outline-1 outline-black/5 transition data-closed:scale-95 data-closed:transform data-closed:opacity-0 data-enter:duration-100 data-enter:ease-out data-leave:duration-75 data-leave:ease-in dark:bg-slate-800 dark:shadow-none dark:-outline-offset-1 dark:outline-white/10"
                   >
-                    {userNavigation.map((item) => (
-                      <MenuItem key={item.name}>
-                        <button
-                          onClick={item.onClick}
-                          className="w-full text-left block px-4 py-2 text-sm text-slate-700 data-focus:bg-slate-100 data-focus:outline-hidden dark:text-slate-300 dark:data-focus:bg-white/5 transition-colors"
-                        >
-                          {item.name}
-                        </button>
-                      </MenuItem>
-                    ))}
+                    <div className="py-1">
+                      {userNavigation.map((item) => (
+                        <MenuItem key={item.name}>
+                          <button
+                            onClick={item.onClick}
+                            className="w-full text-left block px-4 py-2 text-sm text-slate-700 data-focus:bg-slate-100 data-focus:text-slate-900 data-focus:outline-hidden dark:text-slate-300 dark:data-focus:bg-white/5 dark:data-focus:text-white"
+                          >
+                            {item.name}
+                          </button>
+                        </MenuItem>
+                      ))}
+                    </div>
                   </MenuItems>
                 </Menu>
               </div>

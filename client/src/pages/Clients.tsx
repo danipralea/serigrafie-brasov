@@ -7,6 +7,7 @@ import { collection, query, getDocs, addDoc, Timestamp, deleteDoc, doc } from 'f
 import AppShell from '../components/AppShell';
 import AddClientModal from '../components/AddClientModal';
 import EditClientModal from '../components/EditClientModal';
+import InviteClientModal from '../components/InviteClientModal';
 import ConfirmDialog from '../components/ConfirmDialog';
 
 export default function Clients() {
@@ -17,6 +18,7 @@ export default function Clients() {
   const [filteredClients, setFilteredClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -132,15 +134,26 @@ export default function Clients() {
           <div>
             <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">{t('clients.title')}</h2>
           </div>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="px-3 sm:px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-medium transition-opacity hover:opacity-90 flex items-center gap-2 focus:outline-none shrink-0"
-          >
-            <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            <span className="whitespace-nowrap text-sm sm:text-base">{t('clients.addClient')}</span>
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowInviteModal(true)}
+              className="px-3 sm:px-4 py-2 rounded-lg bg-white dark:bg-slate-700 border-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-400 font-medium transition-colors hover:bg-blue-50 dark:hover:bg-slate-600 flex items-center gap-2 focus:outline-none shrink-0"
+            >
+              <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              <span className="whitespace-nowrap text-sm sm:text-base">{t('clients.inviteClient')}</span>
+            </button>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="px-3 sm:px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-medium transition-opacity hover:opacity-90 flex items-center gap-2 focus:outline-none shrink-0"
+            >
+              <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              <span className="whitespace-nowrap text-sm sm:text-base">{t('clients.addClient')}</span>
+            </button>
+          </div>
         </div>
 
         {/* Filters and Search */}
@@ -289,6 +302,12 @@ export default function Clients() {
             </div>
           )}
         </div>
+
+      {/* Invite Client Modal */}
+      <InviteClientModal
+        isOpen={showInviteModal}
+        onClose={() => setShowInviteModal(false)}
+      />
 
       {/* Add Client Modal */}
       <AddClientModal

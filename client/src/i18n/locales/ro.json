@@ -122,6 +122,10 @@
       "inProgress": "În lucru",
       "completed": "Finalizate"
     },
+    "tabs": {
+      "currentOrders": "Comenzi curente",
+      "pastOrders": "Comenzi trecute"
+    },
     "filters": {
       "search": "Caută",
       "searchPlaceholder": "Caută comenzi...",
@@ -145,6 +149,7 @@
       "date": "Dată",
       "actions": "Acțiuni",
       "viewDetails": "Vezi detalii",
+      "reorder": "Recomandă",
       "yourOrders": "Comenzile tale",
       "orders": "Comenzi",
       "noOrders": "Nicio comandă găsită",
@@ -282,7 +287,19 @@
     "saving": "Se salvează...",
     "cancel": "Anulează",
     "updateSuccess": "Profil actualizat cu succes",
-    "updateError": "Eroare la actualizarea profilului"
+    "updateError": "Eroare la actualizarea profilului",
+    "dangerZone": "Zonă periculoasă",
+    "deleteAccount": "Șterge contul",
+    "deleteAccountDesc": "Odată ce îți ștergi contul, nu mai există cale de întoarcere. Te rugăm să fii sigur.",
+    "deleteDialog": {
+      "title": "Șterge contul?",
+      "message": "Ești absolut sigur? Această acțiune nu poate fi anulată. Toate datele tale, inclusiv comenzile și informațiile personale, vor fi șterse permanent.",
+      "warning": "Această acțiune este permanentă și ireversibilă.",
+      "confirm": "Da, șterge contul",
+      "cancel": "Anulează"
+    },
+    "deleteSuccess": "Contul a fost șters cu succes",
+    "deleteError": "Eroare la ștergerea contului"
   },
   "orderDetails": {
     "title": "Comandă",
@@ -390,7 +407,19 @@
     "teamInvitation": "Invitație în echipă",
     "invitedToJoin": "Ai fost invitat să te alături echipei lui",
     "invitedBy": "Invitat de",
+    "email": "Email",
+    "role": "Rol",
     "as": "ca",
+    "signInWithGoogle": "Autentifică-te cu Google",
+    "or": "Sau",
+    "createAccountWithEmail": "Creează cont cu email",
+    "password": "Parolă",
+    "enterPassword": "Introdu parola (minim 6 caractere)",
+    "confirmPassword": "Confirmă parola",
+    "enterConfirmPassword": "Confirmă parola",
+    "creatingAccount": "Se creează contul...",
+    "createAccountAndAccept": "Creează cont & Acceptă",
+    "back": "Înapoi",
     "acceptInvitation": "Acceptă invitația",
     "accepting": "Se acceptă...",
     "decline": "Refuză",
@@ -399,13 +428,23 @@
     "wrongEmail": "Această invitație este pentru",
     "wrongEmailDesc": "Ești autentificat ca",
     "invalidInvitation": "Invitație invalidă",
+    "invalidLink": "Link de invitație invalid",
     "invitationNotFound": "Invitație negăsită",
-    "invitationProcessed": "Această invitație a fost deja",
+    "alreadyProcessed": "Această invitație a fost deja",
     "invitationExpired": "Această invitație a expirat",
     "loadingInvitation": "Se încarcă invitația...",
+    "failedToLoad": "Eroare la încărcarea invitației",
     "success": "Succes!",
-    "invitationAccepted": "Invitație acceptată cu succes!",
-    "invitationDeclined": "Invitație refuzată"
+    "acceptedSuccess": "Invitație acceptată cu succes!",
+    "failedToAccept": "Eroare la acceptarea invitației",
+    "passwordTooShort": "Parola trebuie să aibă cel puțin 6 caractere",
+    "passwordsDoNotMatch": "Parolele nu se potrivesc",
+    "accountCreated": "Cont creat și invitație acceptată!",
+    "emailAlreadyExists": "Există deja un cont cu acest email. Te rugăm să te autentifici.",
+    "passwordTooWeak": "Parola este prea slabă. Te rugăm să folosești o parolă mai puternică.",
+    "failedToCreateAccount": "Eroare la crearea contului. Te rugăm să încerci din nou.",
+    "declined": "Invitație refuzată",
+    "failedToDecline": "Eroare la refuzarea invitației"
   },
   "invoice": {
     "title": "Factură",
@@ -437,6 +476,7 @@
     "title": "Clienți",
     "subtitle": "Gestionează baza de date cu clienți",
     "addClient": "Adaugă client",
+    "inviteClient": "Invită client",
     "allClients": "Toți clienții",
     "noClients": "Niciun client găsit",
     "noClientsDesc": "Începe prin adăugarea primului client.",
@@ -499,6 +539,23 @@
       "errorEmail": "Te rugăm să introduci o adresă de email validă",
       "errorFailed": "Eroare la actualizarea clientului. Te rugăm să încerci din nou.",
       "updateSuccess": "Client actualizat cu succes"
+    },
+    "inviteModal": {
+      "title": "Invită client",
+      "nameLabel": "Nume (opțional)",
+      "namePlaceholder": "Ion Popescu",
+      "emailLabel": "Email",
+      "emailPlaceholder": "client@exemplu.ro",
+      "cancelButton": "Anulează",
+      "sendButton": "Trimite invitație",
+      "sendingButton": "Se trimite...",
+      "copyButton": "Copiază",
+      "errorEmailRequired": "Email-ul este obligatoriu",
+      "errorInvalidEmail": "Te rugăm să introduci o adresă de email validă",
+      "errorFailed": "Eroare la trimiterea invitației. Te rugăm să încerci din nou.",
+      "invitationSent": "Invitație trimisă cu succes către",
+      "invitationCreated": "Invitație creată pentru",
+      "expiryNote": "Invitația va expira în 30 de zile."
     }
   }
 }

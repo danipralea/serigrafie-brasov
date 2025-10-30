@@ -23,6 +23,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showPlaceOrderModal, setShowPlaceOrderModal] = useState(false);
+  const [initialOrderData, setInitialOrderData] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [updateText, setUpdateText] = useState('');
@@ -37,7 +38,8 @@ export default function Dashboard() {
   const [showDeleteUpdateDialog, setShowDeleteUpdateDialog] = useState(false);
   const [selectedUpdateId, setSelectedUpdateId] = useState(null);
 
-  // Filter and sort states
+  // Tab and filter states
+  const [activeTab, setActiveTab] = useState('current'); // 'current' or 'past'
   const [statusFilter, setStatusFilter] = useState('all');
   const [productFilter, setProductFilter] = useState('all');
   const [sortBy, setSortBy] = useState('date-desc');
@@ -93,7 +95,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     applyFiltersAndSort();
-  }, [orders, statusFilter, productFilter, sortBy, searchQuery]);
+  }, [orders, activeTab, statusFilter, productFilter, sortBy, searchQuery]);
 
   // Check if we need to open a specific order from notification
   useEffect(() => {
@@ -132,6 +134,22 @@ export default function Dashboard() {
 
   function applyFiltersAndSort() {
     let filtered = [...orders];
+
+    // Apply tab filter - separate current and past orders
+    if (activeTab === 'current') {
+      // Current orders: pending_confirmation, pending, in_progress
+      filtered = filtered.filter(order =>
+        order.status === OrderStatus.PENDING_CONFIRMATION ||
+        order.status === OrderStatus.PENDING ||
+        order.status === OrderStatus.IN_PROGRESS
+      );
+    } else {
+      // Past orders: completed, cancelled
+      filtered = filtered.filter(order =>
+        order.status === OrderStatus.COMPLETED ||
+        order.status === OrderStatus.CANCELLED
+      );
+    }
 
     // Apply status filter
     if (statusFilter !== 'all') {
@@ -182,6 +200,12 @@ export default function Dashboard() {
     setSelectedOrder(order);
     setShowOrderModal(true);
     await fetchOrderUpdates(order.id);
+  }
+
+  function handleReorder(e, order) {
+    e.stopPropagation(); // Prevent row click from opening order details
+    setInitialOrderData(order);
+    setShowPlaceOrderModal(true);
   }
 
   async function fetchOrderUpdates(orderId) {
@@ -622,6 +646,38 @@ export default function Dashboard() {
         </div>
         )}
 
+        {/* Tab Bar - Current vs Past Orders */}
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 transition-colors mb-6">
+          <div className="flex border-b border-slate-200 dark:border-slate-700">
+            <button
+              onClick={() => setActiveTab('past')}
+              className={`flex-1 px-6 py-4 text-sm font-medium transition-colors relative ${
+                activeTab === 'past'
+                  ? 'text-blue-600 dark:text-blue-400'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              {t('dashboard.tabs.pastOrders')}
+              {activeTab === 'past' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400"></div>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('current')}
+              className={`flex-1 px-6 py-4 text-sm font-medium transition-colors relative ${
+                activeTab === 'current'
+                  ? 'text-blue-600 dark:text-blue-400'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              {t('dashboard.tabs.currentOrders')}
+              {activeTab === 'current' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400"></div>
+              )}
+            </button>
+          </div>
+        </div>
+
         {/* Orders Table */}
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 transition-colors">
           <div className="px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center gap-2">
@@ -693,6 +749,11 @@ export default function Dashboard() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                       {t('dashboard.table.date')}
                     </th>
+                    {activeTab === 'past' && !userProfile?.isAdmin && !userProfile?.isTeamMember && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                        {t('dashboard.table.actions')}
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
@@ -722,6 +783,19 @@ export default function Dashboard() {
                           return `${dateStr} - ${timeStr}`;
                         })()}
                       </td>
+                      {activeTab === 'past' && !userProfile?.isAdmin && !userProfile?.isTeamMember && (
+                        <td className="px-6 py-4 whitespace-nowrap text-sm" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={(e) => handleReorder(e, order)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors focus:outline-none"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            {t('dashboard.table.reorder')}
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -1221,11 +1295,16 @@ export default function Dashboard() {
       {/* Place Order Modal */}
       <PlaceOrderModal
         open={showPlaceOrderModal}
-        onClose={() => setShowPlaceOrderModal(false)}
+        onClose={() => {
+          setShowPlaceOrderModal(false);
+          setInitialOrderData(null);
+        }}
         onSuccess={() => {
           setShowPlaceOrderModal(false);
+          setInitialOrderData(null);
           // Order will appear automatically via real-time listener
         }}
+        initialData={initialOrderData}
       />
       </div>
     </AppShell>

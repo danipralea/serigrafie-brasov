@@ -122,6 +122,10 @@
       "inProgress": "In Progress",
       "completed": "Completed"
     },
+    "tabs": {
+      "currentOrders": "Current Orders",
+      "pastOrders": "Past Orders"
+    },
     "filters": {
       "search": "Search",
       "searchPlaceholder": "Search orders...",
@@ -145,6 +149,7 @@
       "date": "Date",
       "actions": "Actions",
       "viewDetails": "View Details",
+      "reorder": "Reorder",
       "yourOrders": "Your Orders",
       "orders": "Orders",
       "noOrders": "No orders found",
@@ -282,7 +287,19 @@
     "saving": "Saving...",
     "cancel": "Cancel",
     "updateSuccess": "Profile updated successfully",
-    "updateError": "Error updating profile"
+    "updateError": "Error updating profile",
+    "dangerZone": "Danger Zone",
+    "deleteAccount": "Delete Account",
+    "deleteAccountDesc": "Once you delete your account, there is no going back. Please be certain.",
+    "deleteDialog": {
+      "title": "Delete Account?",
+      "message": "Are you absolutely sure? This action cannot be undone. All your data, including orders and personal information, will be permanently deleted.",
+      "warning": "This action is permanent and irreversible.",
+      "confirm": "Yes, delete my account",
+      "cancel": "Cancel"
+    },
+    "deleteSuccess": "Account deleted successfully",
+    "deleteError": "Error deleting account"
   },
   "orderDetails": {
     "title": "Order",
@@ -390,7 +407,19 @@
     "teamInvitation": "Team Invitation",
     "invitedToJoin": "You've been invited to join",
     "invitedBy": "Invited by",
+    "email": "Email",
+    "role": "Role",
     "as": "as",
+    "signInWithGoogle": "Sign in with Google",
+    "or": "Or",
+    "createAccountWithEmail": "Create account with email",
+    "password": "Password",
+    "enterPassword": "Enter password (min 6 characters)",
+    "confirmPassword": "Confirm Password",
+    "enterConfirmPassword": "Confirm password",
+    "creatingAccount": "Creating account...",
+    "createAccountAndAccept": "Create account & Accept",
+    "back": "Back",
     "acceptInvitation": "Accept Invitation",
     "accepting": "Accepting...",
     "decline": "Decline",
@@ -399,13 +428,23 @@
     "wrongEmail": "This invitation is for",
     "wrongEmailDesc": "You're currently signed in as",
     "invalidInvitation": "Invalid Invitation",
+    "invalidLink": "Invalid invitation link",
     "invitationNotFound": "Invitation not found",
-    "invitationProcessed": "This invitation has already been",
+    "alreadyProcessed": "This invitation has already been",
     "invitationExpired": "This invitation has expired",
     "loadingInvitation": "Loading invitation...",
+    "failedToLoad": "Failed to load invitation",
     "success": "Success!",
-    "invitationAccepted": "Invitation accepted successfully!",
-    "invitationDeclined": "Invitation declined"
+    "acceptedSuccess": "Invitation accepted successfully!",
+    "failedToAccept": "Failed to accept invitation",
+    "passwordTooShort": "Password must be at least 6 characters",
+    "passwordsDoNotMatch": "Passwords do not match",
+    "accountCreated": "Account created and invitation accepted!",
+    "emailAlreadyExists": "An account with this email already exists. Please sign in instead.",
+    "passwordTooWeak": "Password is too weak. Please use a stronger password.",
+    "failedToCreateAccount": "Failed to create account. Please try again.",
+    "declined": "Invitation declined",
+    "failedToDecline": "Failed to decline invitation"
   },
   "invoice": {
     "title": "Invoice",
@@ -437,6 +476,7 @@
     "title": "Clients",
     "subtitle": "Manage your client database",
     "addClient": "Add Client",
+    "inviteClient": "Invite Client",
     "allClients": "All Clients",
     "noClients": "No clients found",
     "noClientsDesc": "Get started by adding your first client.",
@@ -499,6 +539,23 @@
       "errorEmail": "Please enter a valid email address",
       "errorFailed": "Failed to update client. Please try again.",
       "updateSuccess": "Client updated successfully"
+    },
+    "inviteModal": {
+      "title": "Invite Client",
+      "nameLabel": "Name (optional)",
+      "namePlaceholder": "John Doe",
+      "emailLabel": "Email",
+      "emailPlaceholder": "client@example.com",
+      "cancelButton": "Cancel",
+      "sendButton": "Send Invitation",
+      "sendingButton": "Sending...",
+      "copyButton": "Copy",
+      "errorEmailRequired": "Email is required",
+      "errorInvalidEmail": "Please enter a valid email address",
+      "errorFailed": "Failed to send invitation. Please try again.",
+      "invitationSent": "Invitation sent successfully to",
+      "invitationCreated": "Invitation created for",
+      "expiryNote": "This invitation will expire in 30 days."
     }
   }
 }

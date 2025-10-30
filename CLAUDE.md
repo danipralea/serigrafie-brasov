@@ -33,12 +33,28 @@ firebase deploy --only functions  # Deploy to Firebase
 firebase functions:log   # View function logs
 ```
 
-### Firebase Email Configuration
+### Email Configuration (Google Secret Manager)
+
+The Cloud Function uses Google Secret Manager for email credentials. Set the secrets using:
+
 ```bash
-# Set Gmail credentials for sending invitation emails
-firebase functions:config:set email.user="praleadanut@gmail.com"
-firebase functions:config:set email.pass="rgbc fqgf bnnh gech"
+# Create secrets in Google Secret Manager (replace with actual values)
+echo -n "your-email@gmail.com" | gcloud secrets create EMAIL_USER --data-file=-
+echo -n "your-app-password" | gcloud secrets create EMAIL_PASS --data-file=-
+
+# Grant access to Cloud Functions
+gcloud secrets add-iam-policy-binding EMAIL_USER \
+  --member="serviceAccount:serigrafie-brasov@appspot.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor"
+
+gcloud secrets add-iam-policy-binding EMAIL_PASS \
+  --member="serviceAccount:serigrafie-brasov@appspot.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor"
 ```
+
+**Note:** For Gmail, generate an app password at https://myaccount.google.com/apppasswords
+
+**Important:** Never commit actual credentials to the repository!
 
 ### Firebase Deployment
 ```bash

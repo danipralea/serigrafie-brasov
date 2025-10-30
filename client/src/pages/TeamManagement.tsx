@@ -36,7 +36,7 @@ export default function TeamManagement() {
       const invitationsRef = collection(db, 'teamInvitations');
       const invitationsQuery = query(
         invitationsRef,
-        where('teamOwnerId', '==', currentUser.uid),
+        where('invitedBy', '==', currentUser.uid),
         where('status', '==', 'pending')
       );
       const invitationsSnapshot = await getDocs(invitationsQuery);
@@ -53,7 +53,7 @@ export default function TeamManagement() {
       // For now, we'll show accepted invitations as team members
       const acceptedQuery = query(
         invitationsRef,
-        where('teamOwnerId', '==', currentUser.uid),
+        where('invitedBy', '==', currentUser.uid),
         where('status', '==', 'accepted')
       );
       const acceptedSnapshot = await getDocs(acceptedQuery);

@@ -14,9 +14,10 @@ interface PlaceOrderModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess: (order?: any) => void;
+  initialData?: any;
 }
 
-export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrderModalProps) {
+export default function PlaceOrderModal({ open, onClose, onSuccess, initialData }: PlaceOrderModalProps) {
   const { currentUser } = useAuth();
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
@@ -24,16 +25,16 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [pendingSubmit, setPendingSubmit] = useState(false);
   const [formData, setFormData] = useState({
-    productType: ProductType.MUGS,
-    quantity: '',
-    length: '',
-    width: '',
-    cmp: '',
-    description: '',
-    designFile: '',
-    deadline: '',
-    contactPhone: '',
-    notes: ''
+    productType: initialData?.productType || ProductType.MUGS,
+    quantity: initialData?.quantity?.toString() || '',
+    length: initialData?.length?.toString() || '',
+    width: initialData?.width?.toString() || '',
+    cmp: initialData?.cmp?.toString() || '',
+    description: initialData?.description || '',
+    designFile: initialData?.designFile || '',
+    deadline: initialData?.deadline || '',
+    contactPhone: initialData?.contactPhone || '',
+    notes: initialData?.notes || ''
   });
 
   // Clear error when user authenticates and submit order if pending
