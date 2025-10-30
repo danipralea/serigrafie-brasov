@@ -126,6 +126,4 @@ export async function sendInvoiceToClient(invoiceData: InvoiceData): Promise<voi
   // 1. Upload PDF to Firebase Storage
   // 2. Call a Cloud Function that sends the email with the PDF attachment
   // 3. Use a service like SendGrid, AWS SES, or similar
-
-  console.log('Invoice generated and ready to send:', pdfBlob);
 }

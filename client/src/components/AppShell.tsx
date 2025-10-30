@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
-import { Disclosure, DisclosureButton, DisclosurePanel, Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react';
+import { Disclosure, DisclosureButton, DisclosurePanel, Menu, MenuButton, MenuItem, MenuItems, Transition } from '@headlessui/react';
 import { Bars3Icon, XMarkIcon, GlobeAltIcon, SunIcon, MoonIcon, ComputerDesktopIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon as XMarkIconSolid } from '@heroicons/react/20/solid';
+import { db } from '../firebase';
+import { collection, query, orderBy as firestoreOrderBy, onSnapshot, limit } from 'firebase/firestore';
 
 function classNames(...classes: string[]) {
   return classes.filter(Boolean).join(' ');
@@ -18,6 +21,9 @@ export default function AppShell({ children, title }: { children: React.ReactNod
     const saved = localStorage.getItem('themeMode');
     return (saved as 'light' | 'dark' | 'system') || 'system';
   });
+  const [showNotification, setShowNotification] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState('');
+  const [notificationOrderId, setNotificationOrderId] = useState('');
 
   // Apply dark mode based on theme preference
   useEffect(() => {
@@ -51,6 +57,68 @@ export default function AppShell({ children, title }: { children: React.ReactNod
       return () => mediaQuery.removeEventListener('change', handleChange);
     }
   }, [themeMode]);
+
+  // Listen for new orders and show toast
+  useEffect(() => {
+    if (!currentUser || !userProfile) {
+      return;
+    }
+
+    // Only for admins and team members
+    if (!userProfile.isAdmin && !userProfile.isTeamMember) {
+      return;
+    }
+
+    const ordersRef = collection(db, 'orders');
+    const q = query(
+      ordersRef,
+      firestoreOrderBy('createdAt', 'desc'),
+      limit(20)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added') {
+          const order = change.doc.data();
+          const orderAge = Date.now() - order.createdAt?.toMillis();
+          // Only show notification for orders created in the last 10 seconds (to avoid showing old ones on page load)
+          if (orderAge < 10000) {
+            const message = `${order.userName || order.userEmail} a plasat comanda #${change.doc.id.substring(0, 8).toUpperCase()}`;
+            const orderId = change.doc.id;
+
+            // Play notification sound
+            try {
+              const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+              const oscillator = audioContext.createOscillator();
+              const gainNode = audioContext.createGain();
+
+              oscillator.connect(gainNode);
+              gainNode.connect(audioContext.destination);
+
+              oscillator.frequency.value = 800;
+              oscillator.type = 'sine';
+
+              gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+              gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+              oscillator.start(audioContext.currentTime);
+              oscillator.stop(audioContext.currentTime + 0.5);
+            } catch (error) {
+              console.error('Error playing notification sound:', error);
+            }
+
+            setNotificationMessage(message);
+            setNotificationOrderId(orderId);
+            setShowNotification(true);
+            // Auto-hide after 6 seconds
+            setTimeout(() => setShowNotification(false), 6000);
+          }
+        }
+      });
+    });
+
+    return () => unsubscribe();
+  }, [currentUser, userProfile]);
 
   const navigation = [
     { name: t('nav.orders'), href: '/dashboard', current: location.pathname === '/dashboard' },
@@ -316,17 +384,59 @@ export default function AppShell({ children, title }: { children: React.ReactNod
         </DisclosurePanel>
       </Disclosure>
 
-      {title && (
-        <header className="relative bg-white shadow-sm dark:bg-slate-800 dark:shadow-none dark:after:pointer-events-none dark:after:absolute dark:after:inset-x-0 dark:after:inset-y-0 dark:after:border-y dark:after:border-white/10">
-          <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">{title}</h1>
-          </div>
-        </header>
-      )}
-
       <main className="bg-slate-50 dark:bg-slate-900 min-h-[calc(100vh-4rem)] transition-colors">
         {children}
       </main>
+
+      {/* Global notification live region */}
+      <div
+        aria-live="assertive"
+        className="pointer-events-none fixed inset-0 flex items-end px-4 py-6 sm:items-start sm:p-6 z-50"
+      >
+        <div className="flex w-full flex-col items-center space-y-4 sm:items-end">
+          <Transition show={showNotification}>
+            <div className="pointer-events-auto w-full max-w-sm rounded-lg bg-white shadow-lg outline-1 outline-black/5 transition data-closed:opacity-0 data-enter:transform data-enter:duration-300 data-enter:ease-out data-closed:data-enter:translate-y-2 data-leave:duration-100 data-leave:ease-in data-closed:data-enter:sm:translate-x-2 data-closed:data-enter:sm:translate-y-0 dark:bg-slate-800 dark:-outline-offset-1 dark:outline-white/10">
+              <div className="p-4">
+                <div className="flex items-start">
+                  <div className="shrink-0">
+                    <svg className="size-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <div className="ml-3 w-0 flex-1 pt-0.5">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">Comandă nouă</p>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
+                      {notificationMessage}
+                    </p>
+                    <div className="mt-3 flex space-x-7">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowNotification(false);
+                          navigate('/dashboard', { state: { openOrderId: notificationOrderId } });
+                        }}
+                        className="rounded-md text-sm font-medium text-blue-600 hover:text-blue-500 focus:outline-2 focus:outline-offset-2 focus:outline-blue-500 dark:text-blue-400 dark:hover:text-blue-300 dark:focus:outline-blue-400"
+                      >
+                        {t('common.showDetails')}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="ml-4 flex shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setShowNotification(false)}
+                      className="inline-flex rounded-md text-gray-400 hover:text-gray-500 focus:outline-2 focus:outline-offset-2 focus:outline-blue-600 dark:hover:text-white dark:focus:outline-blue-500"
+                    >
+                      <span className="sr-only">Close</span>
+                      <XMarkIconSolid aria-hidden="true" className="size-5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Transition>
+        </div>
+      </div>
     </div>
   );
 }

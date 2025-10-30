@@ -224,7 +224,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }) {
                 <span className="font-medium text-gray-700 dark:text-slate-200">Continuă cu Email</span>
               </button>
 
-              {/* Phone Option - Temporarily disabled
+              {/* Phone Option */}
               <button
                 onClick={() => setAuthMode('phone')}
                 className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
@@ -234,7 +234,6 @@ export default function AuthModal({ isOpen, onClose, onSuccess }) {
                 </svg>
                 <span className="font-medium text-gray-700 dark:text-slate-200">Continuă cu Telefon</span>
               </button>
-              */}
             </div>
           )}
 

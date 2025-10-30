@@ -16,7 +16,8 @@
     "submit": "Submit",
     "back": "Back",
     "next": "Next",
-    "required": "Required"
+    "required": "Required",
+    "showDetails": "Show details"
   },
   "auth": {
     "signIn": "Sign In",
@@ -133,6 +134,7 @@
       "dateOldest": "Date (Oldest)",
       "quantityHigh": "Quantity (High to Low)",
       "quantityLow": "Quantity (Low to High)",
+      "byStatus": "Status",
       "status": "Status"
     },
     "table": {
@@ -144,6 +146,7 @@
       "actions": "Actions",
       "viewDetails": "View Details",
       "yourOrders": "Your Orders",
+      "orders": "Orders",
       "noOrders": "No orders found",
       "noOrdersDesc": "Get started by placing your first order.",
       "adjustFilters": "Try adjusting your filters."

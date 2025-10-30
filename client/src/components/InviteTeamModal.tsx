@@ -220,7 +220,7 @@ export default function InviteTeamModal({ isOpen, onClose, onInvitationCreated, 
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-medium transition-opacity hover:opacity-90 disabled:opacity-50"
+                className="flex-1 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-medium transition-opacity hover:opacity-90 disabled:opacity-50 focus:outline-none"
               >
                 {loading ? t('team.inviteModal.sendingButton') : t('team.inviteModal.sendButton')}
               </button>

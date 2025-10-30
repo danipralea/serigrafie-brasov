@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
-import { collection, addDoc, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, Timestamp, query, where, getDocs } from 'firebase/firestore';
 import { ProductType, OrderStatus } from '../types';
 import { showSuccess } from '../services/notificationService';
 import AuthModal from './AuthModal';
@@ -13,7 +13,7 @@ import { ChevronDownIcon } from '@heroicons/react/16/solid';
 interface PlaceOrderModalProps {
   open: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (order?: any) => void;
 }
 
 export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrderModalProps) {
@@ -57,7 +57,7 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
   async function handleSubmit(e) {
     e.preventDefault();
 
-    if (!formData.quantity || !formData.description) {
+    if (!formData.quantity) {
       setError(t('placeOrder.errorRequired'));
       return;
     }
@@ -89,6 +89,7 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
       setLoading(true);
 
       const ordersRef = collection(db, 'orders');
+
       const orderDoc = await addDoc(ordersRef, {
         ...formData,
         quantity: parseInt(formData.quantity),
@@ -104,19 +105,25 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
         updatedAt: Timestamp.now()
       });
 
-      // Create notification
-      const notificationsRef = collection(db, 'notifications');
-      await addDoc(notificationsRef, {
-        userId: currentUser.uid,
-        type: 'order_created',
-        title: 'Comandă nouă creată',
-        message: `Comanda #${orderDoc.id.substring(0, 8).toUpperCase()} a fost plasată cu succes`,
-        orderId: orderDoc.id,
-        read: false,
-        createdAt: Timestamp.now()
-      });
 
       showSuccess('Comandă creată cu succes!');
+
+      // Create the order object to return
+      const createdOrder = {
+        id: orderDoc.id,
+        ...formData,
+        quantity: parseInt(formData.quantity),
+        length: formData.length ? parseFloat(formData.length) : null,
+        width: formData.width ? parseFloat(formData.width) : null,
+        cmp: formData.cmp ? parseFloat(formData.cmp) : null,
+        userId: currentUser.uid,
+        userEmail: currentUser.email,
+        userName: currentUser.displayName || currentUser.email,
+        status: OrderStatus.PENDING_CONFIRMATION,
+        confirmedByClient: false,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now()
+      };
 
       // Reset form
       setFormData({
@@ -132,8 +139,8 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
         notes: ''
       });
 
-      // Call success and close callbacks
-      onSuccess();
+      // Call success and close callbacks with the created order
+      onSuccess(createdOrder);
       onClose();
     } catch (err) {
       console.error('Error creating order:', err);
@@ -163,13 +170,23 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
               <DialogTitle className="text-lg font-semibold text-slate-900 dark:text-white">
                 {t('placeOrder.title')}
               </DialogTitle>
-              <button
-                onClick={handleClose}
-                disabled={loading}
-                className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors disabled:opacity-50"
-              >
-                <XMarkIcon className="w-6 h-6" />
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="submit"
+                  form="place-order-form"
+                  disabled={loading}
+                  className="inline-flex justify-center rounded-md bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-2 text-sm font-semibold text-white shadow-xs hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity focus:outline-none"
+                >
+                  {loading ? t('placeOrder.submitting') : t('placeOrder.submit')}
+                </button>
+                <button
+                  onClick={handleClose}
+                  disabled={loading}
+                  className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors disabled:opacity-50"
+                >
+                  <XMarkIcon className="w-6 h-6" />
+                </button>
+              </div>
             </div>
 
             {/* Content */}
@@ -184,8 +201,8 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
                 </div>
               )}
 
-              <form onSubmit={handleSubmit}>
-                <div className="space-y-8 border-b border-slate-200 dark:border-slate-700 pb-12 sm:space-y-0 sm:divide-y sm:divide-slate-200 dark:sm:divide-slate-700 sm:border-t sm:border-t-slate-200 dark:sm:border-t-slate-700 sm:pb-0 transition-colors">
+              <form id="place-order-form" onSubmit={handleSubmit}>
+                <div className="space-y-8 pb-12 sm:space-y-0 sm:divide-y sm:divide-slate-200 dark:sm:divide-slate-700 sm:border-t sm:border-t-slate-200 dark:sm:border-t-slate-700 sm:pb-0 transition-colors">
                   {/* Product Type */}
                   <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
                     <label htmlFor="productType" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
@@ -299,7 +316,7 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
                   {/* Description */}
                   <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
                     <label htmlFor="description" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                      {t('placeOrder.description')} *
+                      {t('placeOrder.description')}
                     </label>
                     <div className="mt-2 sm:col-span-2 sm:mt-0">
                       <textarea
@@ -308,7 +325,6 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
                         rows={4}
                         value={formData.description}
                         onChange={handleChange}
-                        required
                         placeholder={t('placeOrder.descriptionPlaceholder')}
                         className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-2xl sm:text-sm/6 transition-colors"
                       />
@@ -365,7 +381,7 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
                         value={formData.deadline}
                         onChange={handleChange}
                         min={new Date().toISOString().split('T')[0]}
-                        className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-xs sm:text-sm/6 transition-colors"
+                        className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-xs sm:text-sm/6 transition-colors [&::-webkit-calendar-picker-indicator]:dark:invert"
                       />
                     </div>
                   </div>
@@ -405,24 +421,6 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
                       />
                     </div>
                   </div>
-                </div>
-
-                <div className="mt-6 flex items-center justify-end gap-x-6">
-                  <button
-                    type="button"
-                    onClick={handleClose}
-                    disabled={loading}
-                    className="text-sm/6 font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors disabled:opacity-50"
-                  >
-                    {t('placeOrder.cancel')}
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="inline-flex justify-center rounded-md bg-gradient-to-r from-blue-600 to-cyan-500 px-3 py-2 text-sm font-semibold text-white shadow-xs hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
-                  >
-                    {loading ? t('placeOrder.submitting') : t('placeOrder.submit')}
-                  </button>
                 </div>
               </form>
             </div>

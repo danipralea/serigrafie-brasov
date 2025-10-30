@@ -16,7 +16,8 @@
     "submit": "Trimite",
     "back": "Înapoi",
     "next": "Înainte",
-    "required": "Obligatoriu"
+    "required": "Obligatoriu",
+    "showDetails": "Vezi detalii"
   },
   "auth": {
     "signIn": "Autentificare",
@@ -133,6 +134,7 @@
       "dateOldest": "Dată (Cele mai vechi)",
       "quantityHigh": "Cantitate (Mare spre mic)",
       "quantityLow": "Cantitate (Mic spre mare)",
+      "byStatus": "Status",
       "status": "Status"
     },
     "table": {
@@ -144,6 +146,7 @@
       "actions": "Acțiuni",
       "viewDetails": "Vezi detalii",
       "yourOrders": "Comenzile tale",
+      "orders": "Comenzi",
       "noOrders": "Nicio comandă găsită",
       "noOrdersDesc": "Începe prin plasarea primei comenzi.",
       "adjustFilters": "Încearcă să ajustezi filtrele."

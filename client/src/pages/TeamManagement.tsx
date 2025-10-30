@@ -134,14 +134,13 @@ export default function TeamManagement() {
   return (
     <AppShell title={t('team.title')}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex justify-between items-center mb-8 gap-2">
           <div>
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">{t('team.title')}</h2>
-            <p className="mt-2 text-gray-600 dark:text-slate-400">{t('team.subtitle')}</p>
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">{t('team.title')}</h2>
           </div>
           <button
             onClick={() => setShowInviteModal(true)}
-            className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-medium transition-opacity hover:opacity-90"
+            className="px-3 sm:px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-medium transition-opacity hover:opacity-90 focus:outline-none shrink-0 whitespace-nowrap text-sm sm:text-base"
           >
             {t('team.inviteMember')}
           </button>
@@ -276,10 +275,7 @@ export default function TeamManagement() {
       {/* Invite Team Modal */}
       <InviteTeamModal
         isOpen={showInviteModal}
-        onClose={() => {
-          setShowInviteModal(false);
-          fetchTeamData(); // Refresh data after closing modal
-        }}
+        onClose={() => setShowInviteModal(false)}
         onInvitationCreated={fetchTeamData}
         existingEmails={[...teamMembers.map(m => m.email), ...pendingInvitations.map(i => i.email)]}
       />

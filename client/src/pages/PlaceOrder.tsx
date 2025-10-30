@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
-import { collection, addDoc, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, Timestamp, query, where, getDocs } from 'firebase/firestore';
 import { ProductType, OrderStatus } from '../types';
 import { showSuccess, showError } from '../services/notificationService';
 import AuthModal from '../components/AuthModal';
@@ -101,7 +101,7 @@ export default function PlaceOrder() {
         updatedAt: Timestamp.now()
       });
 
-      // Create notification
+      // Create notification for client
       const notificationsRef = collection(db, 'notifications');
       await addDoc(notificationsRef, {
         userId: currentUser.uid,
@@ -112,6 +112,25 @@ export default function PlaceOrder() {
         read: false,
         createdAt: Timestamp.now()
       });
+
+      // Create notifications for all admins
+      const usersRef = collection(db, 'users');
+      const adminsQuery = query(usersRef, where('isAdmin', '==', true));
+      const adminsSnapshot = await getDocs(adminsQuery);
+
+      const adminNotifications = adminsSnapshot.docs.map(adminDoc => {
+        return addDoc(notificationsRef, {
+          userId: adminDoc.id,
+          type: 'new_order',
+          title: 'Comandă nouă primită',
+          message: `${currentUser.displayName || currentUser.email} a plasat comanda #${orderDoc.id.substring(0, 8).toUpperCase()}`,
+          orderId: orderDoc.id,
+          read: false,
+          createdAt: Timestamp.now()
+        });
+      });
+
+      await Promise.all(adminNotifications);
 
       showSuccess('Comandă creată cu succes!');
       navigate('/dashboard');
@@ -321,7 +340,7 @@ export default function PlaceOrder() {
                       value={formData.deadline}
                       onChange={handleChange}
                       min={new Date().toISOString().split('T')[0]}
-                      className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-xs sm:text-sm/6 transition-colors"
+                      className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-xs sm:text-sm/6 transition-colors [color-scheme:light] dark:[color-scheme:dark]"
                     />
                   </div>
                 </div>
@@ -589,7 +608,7 @@ export default function PlaceOrder() {
                       value={formData.deadline}
                       onChange={handleChange}
                       min={new Date().toISOString().split('T')[0]}
-                      className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-xs sm:text-sm/6 transition-colors"
+                      className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-xs sm:text-sm/6 transition-colors [color-scheme:light] dark:[color-scheme:dark]"
                     />
                   </div>
                 </div>

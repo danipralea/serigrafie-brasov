@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
-import { db, storage } from '../firebase';
-import { collection, query, where, getDocs, orderBy as firestoreOrderBy, doc, updateDoc, addDoc, deleteDoc, Timestamp } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db } from '../firebase';
+import { collection, query, where, getDocs, orderBy as firestoreOrderBy, doc, updateDoc, addDoc, deleteDoc, Timestamp, onSnapshot } from 'firebase/firestore';
 import { OrderStatus, ProductType } from '../types';
 import InviteTeamModal from '../components/InviteTeamModal';
 import PlaceOrderModal from '../components/PlaceOrderModal';
@@ -12,10 +11,12 @@ import Notifications from '../components/Notifications';
 import ConfirmDialog from '../components/ConfirmDialog';
 import AppShell from '../components/AppShell';
 import { downloadInvoice, sendInvoiceToClient } from '../services/invoiceService';
+import { uploadFile } from '../services/storageService';
 
 export default function Dashboard() {
   const { currentUser, userProfile } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useTranslation();
   const [orders, setOrders] = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
@@ -33,6 +34,8 @@ export default function Dashboard() {
   const attachmentInputRef = useRef(null);
   const updatesEndRef = useRef(null);
   const [sendingInvoice, setSendingInvoice] = useState(false);
+  const [showDeleteUpdateDialog, setShowDeleteUpdateDialog] = useState(false);
+  const [selectedUpdateId, setSelectedUpdateId] = useState(null);
 
   // Filter and sort states
   const [statusFilter, setStatusFilter] = useState('all');
@@ -41,15 +44,69 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    if (currentUser && userProfile) {
-      fetchOrders();
+    if (!currentUser || !userProfile) return;
+
+    // Set up real-time listener for orders
+    const ordersRef = collection(db, 'orders');
+    let q;
+
+    // Admins and team members see all orders
+    if (userProfile?.isAdmin || userProfile?.isTeamMember) {
+      q = query(
+        ordersRef,
+        firestoreOrderBy('createdAt', 'desc')
+      );
+    } else {
+      // Regular clients only see their own orders
+      q = query(
+        ordersRef,
+        where('userId', '==', currentUser.uid)
+      );
     }
+
+    setLoading(true);
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      let ordersData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      // Sort in memory for client queries (to avoid composite index requirement)
+      if (!userProfile?.isAdmin && !userProfile?.isTeamMember) {
+        ordersData.sort((a, b) => {
+          const timeA = a.createdAt?.toMillis() || 0;
+          const timeB = b.createdAt?.toMillis() || 0;
+          return timeB - timeA; // desc order
+        });
+      }
+
+      setOrders(ordersData);
+      setLoading(false);
+    }, (error) => {
+      console.error('Error fetching orders:', error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, userProfile]);
 
   useEffect(() => {
     applyFiltersAndSort();
   }, [orders, statusFilter, productFilter, sortBy, searchQuery]);
+
+  // Check if we need to open a specific order from notification
+  useEffect(() => {
+    if (location.state?.openOrderId && orders.length > 0) {
+      const orderToOpen = orders.find(o => o.id === location.state.openOrderId);
+      if (orderToOpen) {
+        openOrderDetails(orderToOpen);
+        // Clear the state so it doesn't reopen on refresh
+        navigate(location.pathname, { replace: true, state: {} });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state, orders]);
 
   // Handle Escape key to close order details modal
   useEffect(() => {
@@ -72,41 +129,6 @@ export default function Dashboard() {
     }
   }, [orderUpdates]);
 
-  async function fetchOrders() {
-    if (!currentUser) return;
-
-    try {
-      setLoading(true);
-      const ordersRef = collection(db, 'orders');
-
-      let q;
-      // Admins and team members see all orders
-      if (userProfile?.isAdmin || userProfile?.isTeamMember) {
-        q = query(
-          ordersRef,
-          firestoreOrderBy('createdAt', 'desc')
-        );
-      } else {
-        // Regular clients only see their own orders
-        q = query(
-          ordersRef,
-          where('userId', '==', currentUser.uid),
-          firestoreOrderBy('createdAt', 'desc')
-        );
-      }
-
-      const snapshot = await getDocs(q);
-      const ordersData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setOrders(ordersData);
-    } catch (error) {
-      console.error('Error fetching orders:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   function applyFiltersAndSort() {
     let filtered = [...orders];
@@ -164,7 +186,6 @@ export default function Dashboard() {
 
   async function fetchOrderUpdates(orderId) {
     try {
-      console.log('Fetching order updates for:', orderId);
       const updatesRef = collection(db, 'orderUpdates');
       const q = query(
         updatesRef,
@@ -183,7 +204,6 @@ export default function Dashboard() {
         return timeA - timeB; // asc order (oldest first, like a chat conversation)
       });
 
-      console.log('Fetched updates:', updates.length, updates);
       setOrderUpdates(updates);
     } catch (error) {
       console.error('Error fetching order updates:', error);
@@ -213,12 +233,6 @@ export default function Dashboard() {
 
     try {
       setPostingUpdate(true);
-      console.log('Posting update...', {
-        orderId: selectedOrder.id,
-        userId: currentUser.uid,
-        text: updateText.trim(),
-        hasAttachment: !!attachmentFile
-      });
 
       let attachmentURL = null;
       let attachmentName = null;
@@ -228,12 +242,10 @@ export default function Dashboard() {
       if (attachmentFile) {
         try {
           setUploadingAttachment(true);
-          const storageRef = ref(storage, `orderAttachments/${selectedOrder.id}/${Date.now()}_${attachmentFile.name}`);
-          await uploadBytes(storageRef, attachmentFile);
-          attachmentURL = await getDownloadURL(storageRef);
-          attachmentName = attachmentFile.name;
-          attachmentType = attachmentFile.type;
-          console.log('Attachment uploaded:', attachmentURL);
+          const result = await uploadFile(attachmentFile, 'updates', currentUser.uid);
+          attachmentURL = result.url;
+          attachmentName = result.name;
+          attachmentType = result.type;
         } catch (uploadError) {
           console.error('Error uploading attachment:', uploadError);
           alert(t('dashboard.orderModal.attachmentUploadFailed'));
@@ -246,9 +258,10 @@ export default function Dashboard() {
       const updateData = {
         orderId: selectedOrder.id,
         userId: currentUser.uid,
-        userName: currentUser.displayName || currentUser.email || 'Unknown',
+        userName: userProfile?.displayName || currentUser.displayName || currentUser.email || 'Unknown',
         userEmail: currentUser.email || '',
         userPhotoURL: userProfile?.photoURL || '',
+        isAdminOrTeamMember: userProfile?.isAdmin || userProfile?.isTeamMember || false,
         text: updateText.trim() || '',
         createdAt: Timestamp.now()
       };
@@ -261,8 +274,6 @@ export default function Dashboard() {
       }
 
       const docRef = await addDoc(updatesRef, updateData);
-
-      console.log('Update posted successfully:', docRef.id);
 
       // Refresh updates
       await fetchOrderUpdates(selectedOrder.id);
@@ -299,8 +310,7 @@ export default function Dashboard() {
         createdAt: Timestamp.now()
       });
 
-      // Refresh orders and updates
-      await fetchOrders();
+      // Refresh updates
       await fetchOrderUpdates(selectedOrder.id);
       setSelectedOrder({ ...selectedOrder, status: newStatus });
     } catch (error) {
@@ -345,8 +355,7 @@ export default function Dashboard() {
         createdAt: Timestamp.now()
       });
 
-      // Refresh orders and updates
-      await fetchOrders();
+      // Refresh updates
       await fetchOrderUpdates(selectedOrder.id);
       setSelectedOrder({ ...selectedOrder, status: OrderStatus.PENDING, confirmedByClient: true });
     } catch (error) {
@@ -377,12 +386,31 @@ export default function Dashboard() {
       const deleteNotifPromises = notificationsSnapshot.docs.map(doc => deleteDoc(doc.ref));
       await Promise.all(deleteNotifPromises);
 
-      // Close modal and refresh orders
+      // Close modal - orders will update automatically via listener
       setShowOrderModal(false);
-      await fetchOrders();
     } catch (error) {
       console.error('Error deleting order:', error);
       alert('Eroare la ștergerea comenzii');
+    }
+  }
+
+  async function handleDeleteUpdate() {
+    if (!selectedUpdateId) return;
+
+    try {
+      const updateRef = doc(db, 'orderUpdates', selectedUpdateId);
+      await deleteDoc(updateRef);
+
+      // Refresh updates
+      if (selectedOrder) {
+        await fetchOrderUpdates(selectedOrder.id);
+      }
+    } catch (error) {
+      console.error('Error deleting update:', error);
+      alert('Eroare la ștergerea actualizării');
+    } finally {
+      setShowDeleteUpdateDialog(false);
+      setSelectedUpdateId(null);
     }
   }
 
@@ -507,7 +535,7 @@ export default function Dashboard() {
         {(userProfile?.isAdmin || userProfile?.isTeamMember) && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-6 border border-slate-200 dark:border-slate-700 transition-colors">
-              <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{t('dashboard.stats.totalOrders')}</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{t('dashboard.stats.total')}</p>
               <p className="text-3xl font-bold text-slate-900 dark:text-white">{stats.total}</p>
             </div>
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-6 border border-slate-200 dark:border-slate-700 transition-colors">
@@ -596,19 +624,19 @@ export default function Dashboard() {
 
         {/* Orders Table */}
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 transition-colors">
-          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-              {t('dashboard.table.yourOrders')} ({filteredOrders.length})
+          <div className="px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center gap-2">
+            <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white whitespace-nowrap">
+              {t(userProfile?.isAdmin || userProfile?.isTeamMember ? 'dashboard.table.orders' : 'dashboard.table.yourOrders')} ({filteredOrders.length})
             </h2>
             <button
               onClick={() => setShowPlaceOrderModal(true)}
               title={t('dashboard.addOrderTitle')}
-              className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-medium transition-opacity hover:opacity-90 flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              className="px-3 sm:px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-medium transition-opacity hover:opacity-90 flex items-center gap-2 focus:outline-none shrink-0"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-              {t('dashboard.addOrder')}
+              <span className="whitespace-nowrap text-sm sm:text-base">{t('dashboard.addOrder')}</span>
             </button>
           </div>
 
@@ -641,7 +669,7 @@ export default function Dashboard() {
                 <div className="mt-6">
                   <button
                     onClick={() => setShowPlaceOrderModal(true)}
-                    className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-gradient-to-r from-blue-600 to-cyan-500 hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                    className="inline-flex items-center px-4 py-2 shadow-sm text-sm font-medium rounded-lg text-white bg-gradient-to-r from-blue-600 to-cyan-500 hover:opacity-90 transition-opacity focus:outline-none"
                   >
                     {t('nav.placeOrder')}
                   </button>
@@ -650,7 +678,7 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+              <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700 table-fixed">
                 <thead className="bg-slate-50 dark:bg-slate-800/50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
@@ -665,14 +693,15 @@ export default function Dashboard() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                       {t('dashboard.table.date')}
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                      {t('dashboard.table.actions')}
-                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
                   {filteredOrders.map((order) => (
-                    <tr key={order.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors">
+                    <tr
+                      key={order.id}
+                      onClick={() => openOrderDetails(order)}
+                      className="hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors"
+                    >
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
                         {getProductLabel(order.productType)}
                       </td>
@@ -685,15 +714,13 @@ export default function Dashboard() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
-                        {order.createdAt?.toDate().toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <button
-                          onClick={() => openOrderDetails(order)}
-                          className="text-blue-600 dark:text-blue-400 hover:underline font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-800 rounded"
-                        >
-                          {t('dashboard.table.viewDetails')}
-                        </button>
+                        {(() => {
+                          const date = order.createdAt?.toDate();
+                          if (!date) return '';
+                          const dateStr = date.toLocaleDateString('ro-RO');
+                          const timeStr = date.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
+                          return `${dateStr} - ${timeStr}`;
+                        })()}
                       </td>
                     </tr>
                   ))}
@@ -718,21 +745,35 @@ export default function Dashboard() {
               <div>
                 <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
                   {t('dashboard.orderModal.order')}
+                  {(userProfile?.isAdmin || userProfile?.isTeamMember) && (
+                    <span className="ml-2 text-sm font-mono text-slate-500 dark:text-slate-400">
+                      #{selectedOrder.id.substring(0, 8).toUpperCase()}
+                    </span>
+                  )}
                 </h3>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                  {t('dashboard.orderModal.created')} {selectedOrder.createdAt?.toDate().toLocaleString()}
+                  {t('dashboard.orderModal.created')} {(() => {
+                    const date = selectedOrder.createdAt?.toDate();
+                    if (!date) return '';
+                    const dateStr = date.toLocaleDateString('ro-RO');
+                    const timeStr = date.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
+                    return `${dateStr} - ${timeStr}`;
+                  })()}
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowDeleteDialog(true)}
-                  className="text-red-600 dark:text-red-500 hover:text-red-800 dark:hover:text-red-400 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-                  title={t('dashboard.orderModal.deleteOrder')}
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
+                {/* Delete button - Only for admins and team members */}
+                {(userProfile?.isAdmin || userProfile?.isTeamMember) && (
+                  <button
+                    onClick={() => setShowDeleteDialog(true)}
+                    className="text-red-600 dark:text-red-500 hover:text-red-800 dark:hover:text-red-400 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                    title={t('dashboard.orderModal.deleteOrder')}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                )}
                 <button
                   onClick={() => setShowOrderModal(false)}
                   className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
@@ -863,26 +904,28 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {/* Status Update Section */}
-              <div className="mb-6">
-                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{t('dashboard.orderModal.updateStatus')}</h4>
-                <div className="flex gap-2 flex-wrap">
-                  {Object.values(OrderStatus).map((status) => (
-                    <button
-                      key={status}
-                      onClick={() => updateOrderStatus(status)}
-                      disabled={selectedOrder.status === status || status === OrderStatus.PENDING_CONFIRMATION}
-                      className={`px-3 py-1 text-sm rounded-lg transition-colors ${
-                        selectedOrder.status === status || status === OrderStatus.PENDING_CONFIRMATION
-                          ? 'bg-gray-200 dark:bg-slate-600 text-gray-500 dark:text-slate-400 cursor-not-allowed'
-                          : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-600'
-                      }`}
-                    >
-                      {getStatusLabel(status)}
-                    </button>
-                  ))}
+              {/* Status Update Section - Only for admins and team members */}
+              {(userProfile?.isAdmin || userProfile?.isTeamMember) && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{t('dashboard.orderModal.updateStatus')}</h4>
+                  <div className="flex gap-2 flex-wrap">
+                    {Object.values(OrderStatus).map((status) => (
+                      <button
+                        key={status}
+                        onClick={() => updateOrderStatus(status)}
+                        disabled={selectedOrder.status === status || status === OrderStatus.PENDING_CONFIRMATION}
+                        className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+                          selectedOrder.status === status || status === OrderStatus.PENDING_CONFIRMATION
+                            ? 'bg-gray-200 dark:bg-slate-600 text-gray-500 dark:text-slate-400 cursor-not-allowed'
+                            : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-600'
+                        }`}
+                      >
+                        {getStatusLabel(status)}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Updates Section */}
               <div>
@@ -906,16 +949,19 @@ export default function Dashboard() {
                           return true;
                         })
                         .map((update) => {
-                        const isOwnMessage = update.userId === currentUser?.uid;
                         const isSystemMessage = update.isSystem;
+                        // Client messages on right, admin/team/system on left
+                        const isClientMessage = !isSystemMessage && !update.isAdminOrTeamMember;
+                        // Only admin/team messages can be deleted (not client messages or system messages)
+                        const canDelete = (userProfile?.isAdmin || userProfile?.isTeamMember) && !isSystemMessage && update.isAdminOrTeamMember;
 
                         return (
                           <div
                             key={update.id}
-                            className={`flex gap-2 ${isOwnMessage && !isSystemMessage ? 'justify-end' : 'justify-start'}`}
+                            className={`flex gap-2 ${isClientMessage ? 'justify-end' : 'justify-start'} group`}
                           >
-                            {/* Avatar - only show for non-system messages on the left */}
-                            {!isSystemMessage && !isOwnMessage && (
+                            {/* Avatar - only show for non-system, non-client messages on the left */}
+                            {!isSystemMessage && !isClientMessage && (
                               <div className="flex-shrink-0">
                                 {update.userPhotoURL ? (
                                   <img
@@ -936,17 +982,18 @@ export default function Dashboard() {
                               className={`max-w-[75%] rounded-lg p-3 ${
                                 isSystemMessage
                                   ? 'bg-blue-100 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800'
-                                  : isOwnMessage
+                                  : isClientMessage
                                   ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white'
                                   : 'bg-white dark:bg-slate-600 border border-gray-200 dark:border-slate-500'
                               }`}
                             >
+
                               <div className="flex justify-between items-start gap-2 mb-1">
                                 <span
                                   className={`text-xs font-semibold ${
                                     isSystemMessage
                                       ? 'text-blue-700 dark:text-blue-300'
-                                      : isOwnMessage
+                                      : isClientMessage
                                       ? 'text-blue-100'
                                       : 'text-gray-900 dark:text-white'
                                   }`}
@@ -957,19 +1004,25 @@ export default function Dashboard() {
                                   className={`text-xs whitespace-nowrap ${
                                     isSystemMessage
                                       ? 'text-blue-600 dark:text-blue-400'
-                                      : isOwnMessage
+                                      : isClientMessage
                                       ? 'text-blue-100'
                                       : 'text-gray-500 dark:text-slate-400'
                                   }`}
                                 >
-                                  {update.createdAt?.toDate().toLocaleString()}
+                                  {(() => {
+                                    const date = update.createdAt?.toDate();
+                                    if (!date) return '';
+                                    const dateStr = date.toLocaleDateString('ro-RO');
+                                    const timeStr = date.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
+                                    return `${dateStr} - ${timeStr}`;
+                                  })()}
                                 </span>
                               </div>
                               <p
                                 className={`text-sm ${
                                   isSystemMessage
                                     ? 'text-blue-800 dark:text-blue-200'
-                                    : isOwnMessage
+                                    : isClientMessage
                                     ? 'text-white'
                                     : 'text-gray-700 dark:text-slate-200'
                                 }`}
@@ -994,7 +1047,7 @@ export default function Dashboard() {
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
-                                        isOwnMessage
+                                        isClientMessage
                                           ? 'bg-blue-500/20 border-blue-300 hover:bg-blue-500/30'
                                           : 'bg-gray-100 dark:bg-slate-700 border-gray-300 dark:border-slate-600 hover:bg-gray-200 dark:hover:bg-slate-600'
                                       }`}
@@ -1009,21 +1062,37 @@ export default function Dashboard() {
                               )}
                             </div>
 
-                            {/* Avatar - only show for own messages on the right */}
-                            {!isSystemMessage && isOwnMessage && (
+                            {/* Avatar - only show for client messages on the right */}
+                            {!isSystemMessage && isClientMessage && (
                               <div className="flex-shrink-0">
-                                {userProfile?.photoURL ? (
+                                {update.userPhotoURL ? (
                                   <img
-                                    src={userProfile.photoURL}
-                                    alt={currentUser.displayName || currentUser.email}
+                                    src={update.userPhotoURL}
+                                    alt={update.userName}
                                     className="w-8 h-8 rounded-full object-cover border border-blue-200 dark:border-blue-700"
                                   />
                                 ) : (
                                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white text-xs font-bold border border-blue-200 dark:border-blue-700">
-                                    {getInitials(currentUser.displayName, currentUser.email)}
+                                    {getInitials(update.userName, update.userEmail)}
                                   </div>
                                 )}
                               </div>
+                            )}
+
+                            {/* Delete button - shown on hover for admins/team members, always visible on mobile */}
+                            {canDelete && (
+                              <button
+                                onClick={() => {
+                                  setSelectedUpdateId(update.id);
+                                  setShowDeleteUpdateDialog(true);
+                                }}
+                                className="opacity-50 md:opacity-0 md:group-hover:opacity-100 hover:opacity-100 transition-opacity text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 p-1 self-center"
+                                title="Șterge actualizare"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
                             )}
                           </div>
                         );
@@ -1062,9 +1131,9 @@ export default function Dashboard() {
                     </div>
                   )}
 
-                  <div className="flex justify-between items-center">
+                  <div className="flex flex-col sm:flex-row gap-2 sm:justify-between sm:items-center">
                     {/* Attachment Button */}
-                    <div>
+                    <div className="w-full sm:w-auto">
                       <input
                         ref={attachmentInputRef}
                         type="file"
@@ -1085,7 +1154,7 @@ export default function Dashboard() {
                         type="button"
                         onClick={() => attachmentInputRef.current?.click()}
                         disabled={uploadingAttachment}
-                        className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full sm:w-auto flex items-center justify-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
@@ -1098,7 +1167,7 @@ export default function Dashboard() {
                     <button
                       onClick={postUpdate}
                       disabled={postingUpdate || (!updateText.trim() && !attachmentFile)}
-                      className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full sm:w-auto px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {postingUpdate ? t('dashboard.orderModal.posting') : t('dashboard.orderModal.postUpdate')}
                     </button>
@@ -1131,13 +1200,31 @@ export default function Dashboard() {
         />
       )}
 
+      {/* Delete Update Dialog - Shows inline within order modal */}
+      {showOrderModal && (
+        <ConfirmDialog
+          isOpen={showDeleteUpdateDialog}
+          onClose={() => {
+            setShowDeleteUpdateDialog(false);
+            setSelectedUpdateId(null);
+          }}
+          onConfirm={handleDeleteUpdate}
+          title="Șterge actualizare"
+          message="Sigur doriți să ștergeți această actualizare? Această acțiune nu poate fi anulată."
+          confirmText="Șterge"
+          cancelText="Anulează"
+          type="danger"
+          inline={true}
+        />
+      )}
+
       {/* Place Order Modal */}
       <PlaceOrderModal
         open={showPlaceOrderModal}
         onClose={() => setShowPlaceOrderModal(false)}
         onSuccess={() => {
           setShowPlaceOrderModal(false);
-          fetchOrders(); // Refresh orders list
+          // Order will appear automatically via real-time listener
         }}
       />
       </div>
