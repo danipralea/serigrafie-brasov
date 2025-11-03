@@ -6,7 +6,7 @@ import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy as firestoreOrderBy, doc, updateDoc, addDoc, deleteDoc, Timestamp, onSnapshot } from 'firebase/firestore';
 import { OrderStatus, ProductType } from '../types';
 import InviteTeamModal from '../components/InviteTeamModal';
-import PlaceOrderModal from '../components/PlaceOrderModal';
+import PlaceOrderModalV2 from '../components/PlaceOrderModalV2';
 import Notifications from '../components/Notifications';
 import ConfirmDialog from '../components/ConfirmDialog';
 import AppShell from '../components/AppShell';
@@ -42,8 +42,23 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('current'); // 'current' or 'past'
   const [statusFilter, setStatusFilter] = useState('all');
   const [productFilter, setProductFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('date-desc');
+  const [sortBy, setSortBy] = useState('delivery-asc');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Helper function to get earliest delivery time from sub-orders
+  function getEarliestDeliveryTime(subOrders) {
+    if (!subOrders || subOrders.length === 0) return null;
+
+    const times = subOrders
+      .map(so => so.deliveryTime)
+      .filter(dt => dt); // Filter out null/undefined
+
+    if (times.length === 0) return null;
+
+    return times.reduce((earliest, current) => {
+      return new Date(current) < new Date(earliest) ? current : earliest;
+    });
+  }
 
   useEffect(() => {
     if (!currentUser || !userProfile) return;
@@ -67,22 +82,48 @@ export default function Dashboard() {
     }
 
     setLoading(true);
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      let ordersData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      // Fetch orders with their sub-orders
+      const ordersWithSubOrders = await Promise.all(
+        snapshot.docs.map(async (orderDoc) => {
+          const orderData = {
+            id: orderDoc.id,
+            ...orderDoc.data()
+          };
+
+          // Fetch sub-orders for this order
+          try {
+            const subOrdersRef = collection(db, 'orders', orderDoc.id, 'subOrders');
+            const subOrdersSnapshot = await getDocs(subOrdersRef);
+            const subOrders = subOrdersSnapshot.docs.map(subDoc => ({
+              id: subDoc.id,
+              ...subDoc.data()
+            }));
+
+            return {
+              ...orderData,
+              subOrders: subOrders || []
+            };
+          } catch (error) {
+            console.error(`Error fetching sub-orders for order ${orderDoc.id}:`, error);
+            return {
+              ...orderData,
+              subOrders: []
+            };
+          }
+        })
+      );
 
       // Sort in memory for client queries (to avoid composite index requirement)
       if (!userProfile?.isAdmin && !userProfile?.isTeamMember) {
-        ordersData.sort((a, b) => {
+        ordersWithSubOrders.sort((a, b) => {
           const timeA = a.createdAt?.toMillis() || 0;
           const timeB = b.createdAt?.toMillis() || 0;
           return timeB - timeA; // desc order
         });
       }
 
-      setOrders(ordersData);
+      setOrders(ordersWithSubOrders);
       setLoading(false);
     }, (error) => {
       console.error('Error fetching orders:', error);
@@ -156,23 +197,66 @@ export default function Dashboard() {
       filtered = filtered.filter(order => order.status === statusFilter);
     }
 
-    // Apply product filter
+    // Apply product filter - check sub-orders
     if (productFilter !== 'all') {
-      filtered = filtered.filter(order => order.productType === productFilter);
-    }
-
-    // Apply search
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
       filtered = filtered.filter(order =>
-        order.id.toLowerCase().includes(query) ||
-        order.productType.toLowerCase().includes(query) ||
-        order.description?.toLowerCase().includes(query)
+        order.subOrders?.some(so => so.productType === productFilter)
       );
     }
 
-    // Apply sorting
+    // Apply search - check all fields in order and sub-orders
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(order => {
+        // Search in parent order fields
+        const orderMatches =
+          order.id.toLowerCase().includes(query) ||
+          order.clientName?.toLowerCase().includes(query) ||
+          order.clientEmail?.toLowerCase().includes(query) ||
+          order.clientPhone?.toLowerCase().includes(query) ||
+          order.clientCompany?.toLowerCase().includes(query) ||
+          order.userName?.toLowerCase().includes(query) ||
+          order.userEmail?.toLowerCase().includes(query) ||
+          order.status?.toLowerCase().includes(query);
+
+        // Search in sub-order fields
+        const subOrderMatches = order.subOrders?.some(so =>
+          so.productType?.toLowerCase().includes(query) ||
+          so.productTypeName?.toLowerCase().includes(query) ||
+          so.quantity?.toString().includes(query) ||
+          so.length?.toString().includes(query) ||
+          so.width?.toString().includes(query) ||
+          so.cmp?.toString().includes(query) ||
+          so.description?.toLowerCase().includes(query) ||
+          so.designFile?.toLowerCase().includes(query) ||
+          so.notes?.toLowerCase().includes(query) ||
+          so.status?.toLowerCase().includes(query)
+        );
+
+        return orderMatches || subOrderMatches;
+      });
+    }
+
+    // Apply sorting - use earliest delivery time from sub-orders
     switch (sortBy) {
+      case 'delivery-asc':
+        filtered.sort((a, b) => {
+          const aEarliest = getEarliestDeliveryTime(a.subOrders);
+          const bEarliest = getEarliestDeliveryTime(b.subOrders);
+          if (!aEarliest) return 1;
+          if (!bEarliest) return -1;
+          return new Date(aEarliest).getTime() - new Date(bEarliest).getTime();
+        });
+        break;
+      case 'delivery-desc':
+        filtered.sort((a, b) => {
+          const aEarliest = getEarliestDeliveryTime(a.subOrders);
+          const bEarliest = getEarliestDeliveryTime(b.subOrders);
+          if (!aEarliest) return 1;
+          if (!bEarliest) return -1;
+          return new Date(bEarliest).getTime() - new Date(aEarliest).getTime();
+        });
+        break;
       case 'date-desc':
         filtered.sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis());
         break;
@@ -180,10 +264,18 @@ export default function Dashboard() {
         filtered.sort((a, b) => a.createdAt?.toMillis() - b.createdAt?.toMillis());
         break;
       case 'quantity-desc':
-        filtered.sort((a, b) => b.quantity - a.quantity);
+        filtered.sort((a, b) => {
+          const aTotal = (a.subOrders || []).reduce((sum, so) => sum + (so.quantity || 0), 0);
+          const bTotal = (b.subOrders || []).reduce((sum, so) => sum + (so.quantity || 0), 0);
+          return bTotal - aTotal;
+        });
         break;
       case 'quantity-asc':
-        filtered.sort((a, b) => a.quantity - b.quantity);
+        filtered.sort((a, b) => {
+          const aTotal = (a.subOrders || []).reduce((sum, so) => sum + (so.quantity || 0), 0);
+          const bTotal = (b.subOrders || []).reduce((sum, so) => sum + (so.quantity || 0), 0);
+          return aTotal - bTotal;
+        });
         break;
       case 'status':
         filtered.sort((a, b) => a.status.localeCompare(b.status));
@@ -635,6 +727,8 @@ export default function Dashboard() {
                 onChange={(e) => setSortBy(e.target.value)}
                 className="w-full h-10 px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
               >
+                <option value="delivery-asc">{t('dashboard.filters.deliveryEarliest')}</option>
+                <option value="delivery-desc">{t('dashboard.filters.deliveryLatest')}</option>
                 <option value="date-desc">{t('dashboard.filters.dateNewest')}</option>
                 <option value="date-asc">{t('dashboard.filters.dateOldest')}</option>
                 <option value="quantity-desc">{t('dashboard.filters.quantityHigh')}</option>
@@ -738,10 +832,13 @@ export default function Dashboard() {
                 <thead className="bg-slate-50 dark:bg-slate-800/50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                      {t('dashboard.table.product')}
+                      {t('dashboard.table.client')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                      {t('dashboard.table.quantity')}
+                      {t('dashboard.table.items')}
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      {t('dashboard.table.delivery')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                       {t('dashboard.table.status')}
@@ -757,47 +854,67 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
-                  {filteredOrders.map((order) => (
-                    <tr
-                      key={order.id}
-                      onClick={() => openOrderDetails(order)}
-                      className="hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors"
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
-                        {getProductLabel(order.productType)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
-                        {order.quantity}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.status)}`}>
-                          {getStatusLabel(order.status)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
-                        {(() => {
-                          const date = order.createdAt?.toDate();
-                          if (!date) return '';
-                          const dateStr = date.toLocaleDateString('ro-RO');
-                          const timeStr = date.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
-                          return `${dateStr} - ${timeStr}`;
-                        })()}
-                      </td>
-                      {activeTab === 'past' && !userProfile?.isAdmin && !userProfile?.isTeamMember && (
-                        <td className="px-6 py-4 whitespace-nowrap text-sm" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={(e) => handleReorder(e, order)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors focus:outline-none"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                            {t('dashboard.table.reorder')}
-                          </button>
+                  {filteredOrders.map((order) => {
+                    const totalItems = (order.subOrders || []).length;
+                    const totalQuantity = (order.subOrders || []).reduce((sum, so) => sum + (so.quantity || 0), 0);
+                    const earliestDelivery = getEarliestDeliveryTime(order.subOrders);
+
+                    return (
+                      <tr
+                        key={order.id}
+                        onClick={() => openOrderDetails(order)}
+                        className="hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors"
+                      >
+                        <td className="px-6 py-4 text-sm">
+                          <div className="font-medium text-slate-900 dark:text-white">{order.clientName || '-'}</div>
+                          {order.clientCompany && (
+                            <div className="text-xs text-slate-500 dark:text-slate-400">{order.clientCompany}</div>
+                          )}
                         </td>
-                      )}
-                    </tr>
-                  ))}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
+                          <div>{totalItems} {totalItems === 1 ? t('dashboard.table.item') : t('dashboard.table.items')}</div>
+                          <div className="text-xs text-slate-400 dark:text-slate-500">{totalQuantity} {t('dashboard.table.pcs')}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
+                          {earliestDelivery ? (
+                            <>
+                              <div>{new Date(earliestDelivery).toLocaleDateString('ro-RO')}</div>
+                              <div className="text-xs text-slate-400 dark:text-slate-500">
+                                {new Date(earliestDelivery).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                            </>
+                          ) : '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.status)}`}>
+                            {getStatusLabel(order.status)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
+                          {(() => {
+                            const date = order.createdAt?.toDate();
+                            if (!date) return '';
+                            const dateStr = date.toLocaleDateString('ro-RO');
+                            const timeStr = date.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
+                            return `${dateStr} - ${timeStr}`;
+                          })()}
+                        </td>
+                        {activeTab === 'past' && !userProfile?.isAdmin && !userProfile?.isTeamMember && (
+                          <td className="px-6 py-4 whitespace-nowrap text-sm" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={(e) => handleReorder(e, order)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors focus:outline-none"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                              {t('dashboard.table.reorder')}
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -861,61 +978,114 @@ export default function Dashboard() {
 
             {/* Modal Body */}
             <div className="px-6 py-4">
-              {/* Order Details */}
+              {/* Client Information */}
+              {selectedOrder.clientName && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{t('order.clientInformation')}</h4>
+                  <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                    <div className="text-sm space-y-1">
+                      <div className="font-semibold text-blue-900 dark:text-blue-200">{selectedOrder.clientName}</div>
+                      {selectedOrder.clientCompany && (
+                        <div className="text-blue-800 dark:text-blue-300">{selectedOrder.clientCompany}</div>
+                      )}
+                      {selectedOrder.clientEmail && (
+                        <div className="text-blue-700 dark:text-blue-400">{selectedOrder.clientEmail}</div>
+                      )}
+                      {selectedOrder.clientPhone && (
+                        <div className="text-blue-700 dark:text-blue-400">{selectedOrder.clientPhone}</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Order Status */}
               <div className="mb-6">
-                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{t('dashboard.orderModal.orderDetails')}</h4>
-                <div className="bg-gray-50 dark:bg-slate-700 rounded-lg p-4 space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600 dark:text-slate-400">{t('dashboard.orderModal.status')}:</span>
-                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(selectedOrder.status)}`}>
-                      {getStatusLabel(selectedOrder.status)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600 dark:text-slate-400">{t('dashboard.orderModal.product')}:</span>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">{getProductLabel(selectedOrder.productType)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600 dark:text-slate-400">{t('dashboard.orderModal.quantity')}:</span>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">{selectedOrder.quantity}</span>
-                  </div>
-                  {selectedOrder.deadline && (
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600 dark:text-slate-400">{t('dashboard.orderModal.deadline')}:</span>
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">{selectedOrder.deadline}</span>
-                    </div>
-                  )}
-                  {selectedOrder.contactPhone && (
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600 dark:text-slate-400">{t('dashboard.orderModal.phone')}:</span>
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">{selectedOrder.contactPhone}</span>
-                    </div>
-                  )}
-                  <div className="pt-2 border-t border-gray-200 dark:border-slate-600">
-                    <span className="text-sm text-gray-600 dark:text-slate-400">{t('dashboard.orderModal.description')}:</span>
-                    <p className="text-sm text-gray-900 dark:text-white mt-1">{selectedOrder.description}</p>
-                  </div>
-                  {selectedOrder.notes && (
-                    <div className="pt-2 border-t border-gray-200 dark:border-slate-600">
-                      <span className="text-sm text-gray-600 dark:text-slate-400">{t('dashboard.orderModal.notes')}:</span>
-                      <p className="text-sm text-gray-900 dark:text-white mt-1">{selectedOrder.notes}</p>
-                    </div>
-                  )}
-                  {selectedOrder.designFile && (
-                    <div className="pt-2 border-t border-gray-200 dark:border-slate-600">
-                      <span className="text-sm text-gray-600 dark:text-slate-400">{t('dashboard.orderModal.designFile')}:</span>
-                      <a
-                        href={selectedOrder.designFile}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-blue-600 dark:text-blue-400 hover:underline block mt-1"
-                      >
-                        {t('dashboard.orderModal.viewDesign')}
-                      </a>
-                    </div>
-                  )}
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{t('dashboard.orderModal.status')}</h4>
+                <div className="bg-gray-50 dark:bg-slate-700 rounded-lg p-4">
+                  <span className={`px-3 py-1.5 text-xs font-semibold rounded-full ${getStatusColor(selectedOrder.status)}`}>
+                    {getStatusLabel(selectedOrder.status)}
+                  </span>
                 </div>
               </div>
+
+              {/* Sub-Orders */}
+              {selectedOrder.subOrders && selectedOrder.subOrders.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{t('order.orderItems')}</h4>
+                  <div className="space-y-3">
+                    {selectedOrder.subOrders.map((subOrder, index) => (
+                      <div key={subOrder.id} className="bg-gray-50 dark:bg-slate-700 rounded-lg p-4 border border-gray-200 dark:border-slate-600">
+                        <div className="flex items-center justify-between mb-3">
+                          <h5 className="text-sm font-semibold text-gray-900 dark:text-white">
+                            {t('order.subOrderItem')} #{index + 1}
+                          </h5>
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(subOrder.status)}`}>
+                            {getStatusLabel(subOrder.status)}
+                          </span>
+                        </div>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600 dark:text-slate-400">{t('placeOrder.productType')}:</span>
+                            <span className="text-gray-900 dark:text-white font-medium">{subOrder.productTypeName || subOrder.productType}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600 dark:text-slate-400">{t('placeOrder.quantity')}:</span>
+                            <span className="text-gray-900 dark:text-white font-medium">{subOrder.quantity}</span>
+                          </div>
+                          {(subOrder.length || subOrder.width || subOrder.cmp) && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600 dark:text-slate-400">{t('placeOrder.length')} / {t('placeOrder.width')} / {t('placeOrder.cmp')}:</span>
+                              <span className="text-gray-900 dark:text-white">
+                                {subOrder.length || '-'} / {subOrder.width || '-'} / {subOrder.cmp || '-'}
+                              </span>
+                            </div>
+                          )}
+                          {subOrder.deliveryTime && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600 dark:text-slate-400">{t('placeOrder.deliveryTime')}:</span>
+                              <span className="text-gray-900 dark:text-white font-medium">
+                                {new Date(subOrder.deliveryTime).toLocaleString('ro-RO', {
+                                  year: 'numeric',
+                                  month: '2-digit',
+                                  day: '2-digit',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </span>
+                            </div>
+                          )}
+                          {subOrder.description && (
+                            <div className="pt-2 border-t border-gray-200 dark:border-slate-600">
+                              <span className="text-gray-600 dark:text-slate-400">{t('placeOrder.description')}:</span>
+                              <p className="text-gray-900 dark:text-white mt-1">{subOrder.description}</p>
+                            </div>
+                          )}
+                          {subOrder.notes && (
+                            <div className="pt-2 border-t border-gray-200 dark:border-slate-600">
+                              <span className="text-gray-600 dark:text-slate-400">{t('placeOrder.notes')}:</span>
+                              <p className="text-gray-900 dark:text-white mt-1">{subOrder.notes}</p>
+                            </div>
+                          )}
+                          {subOrder.designFile && (
+                            <div className="pt-2 border-t border-gray-200 dark:border-slate-600">
+                              <span className="text-gray-600 dark:text-slate-400">{t('dashboard.orderModal.designFile')}:</span>
+                              <a
+                                href={subOrder.designFile}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 dark:text-blue-400 hover:underline block mt-1"
+                              >
+                                {t('dashboard.orderModal.viewDesign')}
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Invoice Section - Only show for completed orders */}
               {selectedOrder.status === OrderStatus.COMPLETED && (
@@ -1101,7 +1271,10 @@ export default function Dashboard() {
                                     : 'text-gray-700 dark:text-slate-200'
                                 }`}
                               >
-                                {update.text}
+                                {/* Handle old translation keys stored in database */}
+                                {update.text?.startsWith('dashboard.') || update.text?.startsWith('order.') || update.text?.startsWith('placeOrder.')
+                                  ? t(update.text)
+                                  : update.text}
                               </p>
                               {/* Attachment Display */}
                               {update.attachmentURL && (
@@ -1293,7 +1466,7 @@ export default function Dashboard() {
       )}
 
       {/* Place Order Modal */}
-      <PlaceOrderModal
+      <PlaceOrderModalV2
         open={showPlaceOrderModal}
         onClose={() => {
           setShowPlaceOrderModal(false);
@@ -1304,7 +1477,6 @@ export default function Dashboard() {
           setInitialOrderData(null);
           // Order will appear automatically via real-time listener
         }}
-        initialData={initialOrderData}
       />
       </div>
     </AppShell>
