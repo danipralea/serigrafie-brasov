@@ -1265,7 +1265,7 @@ export default function Dashboard() {
                               <p
                                 className={`text-sm ${
                                   isSystemMessage
-                                    ? 'text-blue-800 dark:text-blue-200'
+                                    ? 'text-blue-800 dark:text-white'
                                     : isClientMessage
                                     ? 'text-white'
                                     : 'text-gray-700 dark:text-slate-200'
