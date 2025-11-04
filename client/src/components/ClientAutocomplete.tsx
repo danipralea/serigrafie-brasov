@@ -101,6 +101,13 @@ export default function ClientAutocomplete({ selectedClient, onSelectClient, err
 
   async function handleAddNewClient(e: React.FormEvent) {
     e.preventDefault();
+    e.stopPropagation();
+
+    if (!currentUser) {
+      console.error('No user logged in');
+      alert(t('clients.addModal.errorFailed'));
+      return;
+    }
 
     if (!newClient.name.trim()) {
       alert(t('clients.addModal.errorName'));
