@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { collection, query, getDocs, addDoc, Timestamp } from 'firebase/firestore';
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/20/solid';
@@ -20,6 +21,7 @@ interface ClientAutocompleteProps {
 
 export default function ClientAutocomplete({ selectedClient, onSelectClient, error }: ClientAutocompleteProps) {
   const { t } = useTranslation();
+  const { currentUser } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [clients, setClients] = useState<Client[]>([]);
   const [filteredClients, setFilteredClients] = useState<Client[]>([]);
@@ -116,6 +118,7 @@ export default function ClientAutocomplete({ selectedClient, onSelectClient, err
 
       const clientDoc = await addDoc(clientsRef, {
         ...newClient,
+        userId: currentUser.uid,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now()
       });

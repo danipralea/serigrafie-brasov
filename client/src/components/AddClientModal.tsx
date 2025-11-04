@@ -67,7 +67,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }) {
         company: formData.company.trim(),
         address: formData.address.trim(),
         notes: formData.notes.trim(),
-        createdBy: currentUser.uid,
+        userId: currentUser.uid,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now()
       });
