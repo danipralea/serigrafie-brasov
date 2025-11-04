@@ -586,7 +586,9 @@
       "adding": "Adding...",
       "errorName": "Name is required",
       "errorEmail": "Please enter a valid email address",
-      "errorFailed": "Failed to add client. Please try again."
+      "errorFailed": "Failed to add client. Please try again.",
+      "inviteClient": "Invite client?",
+      "viaEmail": "via Email"
     },
     "viewModal": {
       "title": "Client Details",

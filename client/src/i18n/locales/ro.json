@@ -586,7 +586,9 @@
       "adding": "Se adaugă...",
       "errorName": "Numele este obligatoriu",
       "errorEmail": "Te rugăm să introduci o adresă de email validă",
-      "errorFailed": "Eroare la adăugarea clientului. Te rugăm să încerci din nou."
+      "errorFailed": "Eroare la adăugarea clientului. Te rugăm să încerci din nou.",
+      "inviteClient": "Invită client?",
+      "viaEmail": "prin Email"
     },
     "viewModal": {
       "title": "Detalii client",

@@ -17,6 +17,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }) {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [inviteClient, setInviteClient] = useState(false);
 
   // Handle Escape key to close modal
   useEffect(() => {
@@ -81,6 +82,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }) {
         address: '',
         notes: ''
       });
+      setInviteClient(false);
 
       if (onClientAdded) {
         onClientAdded();
@@ -105,6 +107,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }) {
       notes: ''
     });
     setError('');
+    setInviteClient(false);
     onClose();
   }
 
@@ -241,6 +244,35 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }) {
                   rows={3}
                   className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 />
+              </div>
+
+              {/* Invite Client Toggle */}
+              <div className="flex items-center justify-between py-3">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    {t('clients.addModal.inviteClient')}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setInviteClient(!inviteClient)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      inviteClient
+                        ? 'bg-blue-600'
+                        : 'bg-slate-300 dark:bg-slate-600'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        inviteClient ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+                {inviteClient && (
+                  <span className="text-sm text-slate-500 dark:text-slate-400">
+                    {t('clients.addModal.viaEmail')}
+                  </span>
+                )}
               </div>
 
               {/* Action Buttons */}

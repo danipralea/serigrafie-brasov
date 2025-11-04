@@ -28,6 +28,7 @@ export default function ClientAutocomplete({ selectedClient, onSelectClient, err
   const [showDropdown, setShowDropdown] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [inviteClient, setInviteClient] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // New client form state
@@ -151,6 +152,7 @@ export default function ClientAutocomplete({ selectedClient, onSelectClient, err
         address: '',
         notes: ''
       });
+      setInviteClient(false);
       setShowAddForm(false);
       setShowDropdown(false);
     } catch (error) {
@@ -300,11 +302,41 @@ export default function ClientAutocomplete({ selectedClient, onSelectClient, err
               />
             </div>
 
+            {/* Invite Client Toggle */}
+            <div className="flex items-center justify-between py-2">
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {t('clients.addModal.inviteClient')}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setInviteClient(!inviteClient)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    inviteClient
+                      ? 'bg-blue-600'
+                      : 'bg-gray-300 dark:bg-slate-600'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      inviteClient ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+              {inviteClient && (
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  {t('clients.addModal.viaEmail')}
+                </span>
+              )}
+            </div>
+
             <div className="flex gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => {
                   setShowAddForm(false);
+                  setInviteClient(false);
                   setNewClient({
                     name: '',
                     email: '',
