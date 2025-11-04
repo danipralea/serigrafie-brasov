@@ -61,7 +61,7 @@
     "resetPasswordDesc": "Introdu adresa ta de email și îți vom trimite un link pentru resetarea parolei",
     "sendResetLink": "Trimite link de resetare",
     "backToLogin": "Înapoi la autentificare",
-    "resetEmailSent": "Email de resetare trimis! Verifică inbox-ul.",
+    "resetEmailSent": "Email de resetare trimis! Verifică inbox-ul și dosarul spam/junk.",
     "resetEmailError": "Eroare la trimiterea emailului de resetare"
   },
   "phoneAuth": {

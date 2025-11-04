@@ -113,7 +113,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   async function login(email: string, password: string) {
-    return signInWithEmailAndPassword(auth, email, password);
+    try {
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      return result;
+    } catch (error: any) {
+      console.error('Login failed with error code:', error.code);
+      console.error('Error message:', error.message);
+      console.error('Full error:', error);
+      throw error;
+    }
   }
 
   async function signup(email: string, password: string) {
@@ -165,7 +173,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }
 
   async function sendPasswordResetEmail(email: string) {
-    return firebaseSendPasswordResetEmail(auth, email);
+    try {
+      await firebaseSendPasswordResetEmail(auth, email);
+    } catch (error: any) {
+      console.error('Failed to send password reset email');
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      throw error;
+    }
   }
 
   function setupRecaptcha(containerId: string) {
@@ -180,18 +195,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
         size: 'normal',
         callback: () => {
           // reCAPTCHA solved - user verified
-          console.log('reCAPTCHA verified');
         },
         'expired-callback': () => {
           // Response expired. Ask user to solve reCAPTCHA again.
-          console.log('reCAPTCHA expired');
         }
       });
 
       // Render immediately
-      window.recaptchaVerifier.render().then((widgetId) => {
-        console.log('reCAPTCHA rendered with widget ID:', widgetId);
-      }).catch((error) => {
+      window.recaptchaVerifier.render().catch((error) => {
         console.error('Error rendering reCAPTCHA:', error);
       });
     }

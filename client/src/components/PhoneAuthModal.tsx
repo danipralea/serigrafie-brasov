@@ -73,11 +73,8 @@ export default function PhoneAuthModal({ open, onClose, onSuccess }: PhoneAuthMo
       setLoading(true);
       // Remove spaces before sending
       const cleanedPhone = phoneNumber.replace(/\s/g, '');
-      console.log('Attempting to send SMS to:', cleanedPhone);
-      console.log('reCAPTCHA verifier status:', window.recaptchaVerifier ? 'Ready' : 'Not initialized');
 
       const result = await loginWithPhone(cleanedPhone);
-      console.log('SMS sent successfully, confirmation result:', result);
       setConfirmationResult(result);
       setStep('code');
       showSuccess(t('phoneAuth.successCodeSent'));

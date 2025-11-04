@@ -40,10 +40,8 @@ export default function AuthModal({ isOpen, onClose, onSuccess }) {
       // Handle specific error cases
       if (err.code === 'auth/popup-closed-by-user') {
         // User closed the popup - don't show error, just reset loading
-        console.log('User cancelled Google login');
       } else if (err.code === 'auth/cancelled-popup-request') {
         // Multiple popups opened - don't show error
-        console.log('Popup request cancelled');
       } else {
         // Show error for actual failures
         setError('Failed to sign in with Google');
@@ -97,8 +95,6 @@ export default function AuthModal({ isOpen, onClose, onSuccess }) {
         const formatted = digits.match(/.{1,3}/g)?.join(' ') || digits;
         formattedPhone = '+40 ' + formatted;
       }
-
-      console.log('Sending verification code to:', formattedPhone);
 
       const confirmation = await loginWithPhone(formattedPhone);
       setConfirmationResult(confirmation);

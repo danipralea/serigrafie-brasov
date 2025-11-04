@@ -92,7 +92,7 @@
     "resetPasswordDesc": "Enter your email address and we'll send you a link to reset your password",
     "sendResetLink": "Send reset link",
     "backToLogin": "Back to login",
-    "resetEmailSent": "Reset email sent! Check your inbox.",
+    "resetEmailSent": "Reset email sent! Check your inbox and spam/junk folder.",
     "resetEmailError": "Error sending reset email"
   },
   "phoneAuth": {
