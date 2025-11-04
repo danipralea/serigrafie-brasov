@@ -67,8 +67,12 @@ service cloud.firestore {
       // Admins and team members can update all orders
       allow update: if isAdminOrTeamMember();
 
-      // Only admins can delete orders
-      allow delete: if isAdmin();
+      // Order owners can delete their own orders
+      allow delete: if isAuthenticated() &&
+                       resource.data.userId == request.auth.uid;
+
+      // Admins and team members can delete any order
+      allow delete: if isAdminOrTeamMember();
 
       // Order updates sub-collection
       match /orderUpdates/{updateId} {
@@ -119,8 +123,12 @@ service cloud.firestore {
       // Admins and team members can update all clients
       allow update: if isAdminOrTeamMember();
 
-      // Only admins can delete clients
-      allow delete: if isAdmin();
+      // Client owners can delete their own clients
+      allow delete: if isAuthenticated() &&
+                       resource.data.userId == request.auth.uid;
+
+      // Admins and team members can delete any client
+      allow delete: if isAdminOrTeamMember();
     }
 
     // Product types collection
@@ -147,8 +155,12 @@ service cloud.firestore {
       // Admins and team members can update all product types
       allow update: if isAdminOrTeamMember();
 
-      // Only admins can delete product types
-      allow delete: if isAdmin();
+      // Product type owners can delete their own
+      allow delete: if isAuthenticated() &&
+                       resource.data.userId == request.auth.uid;
+
+      // Admins and team members can delete any product type
+      allow delete: if isAdminOrTeamMember();
     }
 
     // Team invitations collection
