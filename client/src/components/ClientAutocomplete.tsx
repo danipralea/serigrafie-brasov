@@ -99,10 +99,7 @@ export default function ClientAutocomplete({ selectedClient, onSelectClient, err
     setShowDropdown(false);
   }
 
-  async function handleAddNewClient(e: React.FormEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-
+  async function handleAddNewClient() {
     if (!currentUser) {
       console.error('No user logged in');
       alert(t('clients.addModal.errorFailed'));
@@ -242,7 +239,7 @@ export default function ClientAutocomplete({ selectedClient, onSelectClient, err
       {/* Add New Client Form */}
       {showAddForm && (
         <div className="mt-3 p-4 bg-gray-50 dark:bg-slate-700/50 rounded-md border border-gray-300 dark:border-slate-600">
-          <form onSubmit={handleAddNewClient} className="space-y-3">
+          <div className="space-y-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 {t('clients.addModal.name')} *
@@ -315,14 +312,15 @@ export default function ClientAutocomplete({ selectedClient, onSelectClient, err
                 {t('common.cancel')}
               </button>
               <button
-                type="submit"
+                type="button"
+                onClick={handleAddNewClient}
                 disabled={loading}
                 className="flex-1 px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-cyan-500 rounded-md hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
               >
                 {loading ? t('clients.addModal.adding') : t('clients.addModal.add')}
               </button>
             </div>
-          </form>
+          </div>
         </div>
       )}
     </div>
