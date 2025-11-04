@@ -588,6 +588,16 @@
       "errorEmail": "Te rugăm să introduci o adresă de email validă",
       "errorFailed": "Eroare la adăugarea clientului. Te rugăm să încerci din nou."
     },
+    "viewModal": {
+      "title": "Detalii client",
+      "name": "Nume",
+      "email": "Email",
+      "phone": "Telefon",
+      "company": "Companie",
+      "address": "Adresă",
+      "notes": "Notițe",
+      "edit": "Editează"
+    },
     "editModal": {
       "title": "Editează client",
       "name": "Nume",

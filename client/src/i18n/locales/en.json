@@ -588,6 +588,16 @@
       "errorEmail": "Please enter a valid email address",
       "errorFailed": "Failed to add client. Please try again."
     },
+    "viewModal": {
+      "title": "Client Details",
+      "name": "Name",
+      "email": "Email",
+      "phone": "Phone",
+      "company": "Company",
+      "address": "Address",
+      "notes": "Notes",
+      "edit": "Edit"
+    },
     "editModal": {
       "title": "Edit Client",
       "name": "Name",

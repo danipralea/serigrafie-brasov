@@ -225,7 +225,14 @@ export default function ClientAutocomplete({ selectedClient, onSelectClient, err
       {/* Add New Client Toggle */}
       <button
         type="button"
-        onClick={() => setShowAddForm(!showAddForm)}
+        onClick={() => {
+          setShowAddForm(!showAddForm);
+          if (!showAddForm) {
+            // Clear search when opening add form
+            setSearchQuery('');
+            onSelectClient(null);
+          }
+        }}
         className="w-full flex items-center justify-between px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-md transition-colors"
       >
         <span>{t('order.addNewClient')}</span>
