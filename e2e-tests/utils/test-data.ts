@@ -5,6 +5,7 @@ import { connectAuthEmulator } from 'firebase/auth';
 import { connectFirestoreEmulator } from 'firebase/firestore';
 import { connectStorageEmulator } from 'firebase/storage';
 import { getStorage } from 'firebase/storage';
+import fetch from 'node-fetch';
 
 // Firebase config for testing
 const firebaseConfig = {
@@ -69,8 +70,45 @@ export const TEST_USERS = {
   }
 };
 
+// Helper function to write to Firestore emulator bypassing security rules
+async function writeToEmulator(path: string, data: any) {
+  const url = `http://localhost:8080/v1/projects/serigrafie-brasov/databases/(default)/documents/${path}`;
+
+  // Convert data to Firestore format
+  const firestoreData: any = { fields: {} };
+
+  for (const [key, value] of Object.entries(data)) {
+    if (value === null) {
+      firestoreData.fields[key] = { nullValue: null };
+    } else if (typeof value === 'string') {
+      firestoreData.fields[key] = { stringValue: value };
+    } else if (typeof value === 'number') {
+      firestoreData.fields[key] = { integerValue: value.toString() };
+    } else if (typeof value === 'boolean') {
+      firestoreData.fields[key] = { booleanValue: value };
+    } else if (value instanceof Date || (value && typeof value === 'object' && 'seconds' in value)) {
+      // Handle Timestamp
+      const timestamp = value instanceof Date ? value : new Date(value.seconds * 1000);
+      firestoreData.fields[key] = {
+        timestampValue: timestamp.toISOString()
+      };
+    }
+  }
+
+  const response = await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(firestoreData)
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Failed to write to emulator: ${response.status} ${text}`);
+  }
+}
+
 export async function createTestUser(userData: TestUser) {
-  const { auth, db } = initializeTestFirebase();
+  const { auth } = initializeTestFirebase();
 
   try {
     // Create user in Auth
@@ -82,14 +120,14 @@ export async function createTestUser(userData: TestUser) {
 
     const userId = userCredential.user.uid;
 
-    // Create user profile in Firestore
-    await setDoc(doc(db, 'users', userId), {
+    // Create user profile in Firestore using emulator REST API (bypasses security rules)
+    await writeToEmulator(`users/${userId}`, {
       email: userData.email,
       displayName: userData.displayName,
       phoneNumber: null,
       isAdmin: userData.isAdmin || false,
       isTeamMember: userData.isTeamMember || false,
-      createdAt: Timestamp.now()
+      createdAt: new Date()
     });
 
     return { uid: userId, ...userData };
@@ -115,7 +153,9 @@ export async function seedTestData() {
   const teamMember = await createTestUser(TEST_USERS.teamMember);
   const client = await createTestUser(TEST_USERS.client);
 
-  // Create some test product types
+  const now = new Date();
+
+  // Create product types using emulator REST API (bypasses security rules)
   const productTypes = [
     { id: 'mugs', name: 'Mugs', userId: admin.uid },
     { id: 'tshirts', name: 'T-Shirts', userId: admin.uid },
@@ -123,18 +163,18 @@ export async function seedTestData() {
   ];
 
   for (const pt of productTypes) {
-    await setDoc(doc(db, 'productTypes', pt.id), {
+    await writeToEmulator(`productTypes/${pt.id}`, {
       name: pt.name,
       description: '',
       userId: pt.userId,
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now()
+      createdAt: now,
+      updatedAt: now
     });
   }
 
   // Create a test order
   const orderId = 'test-order-1';
-  await setDoc(doc(db, 'orders', orderId), {
+  await writeToEmulator(`orders/${orderId}`, {
     orderName: 'Test Order',
     clientId: client.uid,
     clientName: client.displayName,
@@ -145,12 +185,12 @@ export async function seedTestData() {
     userName: client.displayName,
     userEmail: client.email,
     status: 'pending_confirmation',
-    createdAt: Timestamp.now(),
-    updatedAt: Timestamp.now()
+    createdAt: now,
+    updatedAt: now
   });
 
   // Create sub-order
-  await setDoc(doc(db, 'orders', orderId, 'subOrders', 'sub-1'), {
+  await writeToEmulator(`orders/${orderId}/subOrders/sub-1`, {
     userId: client.uid,
     productType: 'mugs',
     productTypeName: 'Mugs',
@@ -165,8 +205,8 @@ export async function seedTestData() {
     deliveryTime: '2025-12-01',
     notes: '',
     status: 'pending',
-    createdAt: Timestamp.now(),
-    updatedAt: Timestamp.now()
+    createdAt: now,
+    updatedAt: now
   });
 
   return { admin, teamMember, client };
