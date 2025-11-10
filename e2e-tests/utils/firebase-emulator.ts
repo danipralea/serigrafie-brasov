@@ -68,13 +68,26 @@ export class FirebaseEmulatorManager {
     ]);
   }
 
-  private async waitForEmulators(maxAttempts = 30): Promise<void> {
+  private async waitForEmulators(maxAttempts = 60): Promise<void> {
+    console.log('Waiting for emulators to be ready...');
+
     for (let i = 0; i < maxAttempts; i++) {
       try {
-        // Check if Firestore emulator is ready
-        const response = await fetch(`http://localhost:${EMULATOR_PORTS.firestore}/`);
-        if (response.ok) {
+        // Check if both Firestore and Auth emulators are ready
+        const [firestoreResponse, authResponse] = await Promise.all([
+          fetch(`http://localhost:${EMULATOR_PORTS.firestore}/`).catch(() => null),
+          fetch(`http://localhost:${EMULATOR_PORTS.auth}/`).catch(() => null)
+        ]);
+
+        if (firestoreResponse?.ok && authResponse?.ok) {
+          // Wait an additional 2 seconds to ensure all emulators are fully initialized
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          console.log('All emulators are ready!');
           return;
+        }
+
+        if (i % 5 === 0) {
+          console.log(`Waiting for emulators... (attempt ${i + 1}/${maxAttempts})`);
         }
       } catch (error) {
         // Emulator not ready yet

@@ -31,6 +31,20 @@ firebase setup:emulators:storage
 
 ## Running Tests
 
+**Step 1: Start Firebase Emulators** (in a separate terminal)
+
+```bash
+# Option A: Using npm script
+npm run emulators
+
+# Option B: Using the helper script
+./scripts/start-test-env.sh
+```
+
+Keep this terminal open while running tests. You'll see the Emulator UI at `http://localhost:4000`
+
+**Step 2: Run Tests** (in another terminal)
+
 ```bash
 # Run all tests (headless mode)
 npm test
@@ -47,12 +61,12 @@ npm run test:debug
 
 ## What Happens When You Run Tests?
 
-1. **Firebase emulators start** automatically (Auth, Firestore, Storage)
+1. **Tests check** if Firebase emulators are running (must be started manually)
 2. **Vite dev server starts** at `localhost:5173`
 3. **Test data is seeded** (users, orders, product types)
 4. **Tests run** against the local environment
 5. **Data is cleaned** between each test
-6. **Emulators stop** when tests complete
+6. **Emulators keep running** (stop with Ctrl+C in emulator terminal)
 
 ## Test Users
 
@@ -69,22 +83,19 @@ The following users are automatically created for each test:
 npm run test:report
 ```
 
-## Manual Emulator Control
-
-If you want to run emulators separately:
+## Typical Workflow
 
 ```bash
-# Terminal 1: Start emulators
+# Terminal 1: Start emulators (keep running)
 npm run emulators
 
-# Terminal 2: Run dev server
-cd client && npm run dev
-
-# Terminal 3: Run tests
-npx playwright test --headed
+# Terminal 2: Run tests (as many times as you want)
+npm run test:ui      # Interactive mode
+npm test             # Headless mode
+npm run test:headed  # With browser visible
 ```
 
-Access Emulator UI at: `http://localhost:4000`
+Access Emulator UI at: `http://localhost:4000` while emulators are running
 
 ## Next Steps
 

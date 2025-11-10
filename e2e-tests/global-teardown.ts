@@ -1,13 +1,10 @@
 import { FullConfig } from '@playwright/test';
-import { emulatorManager } from './utils/firebase-emulator';
 
 async function globalTeardown(config: FullConfig) {
-  console.log('🛑 Stopping Firebase emulators...');
-
-  // Stop emulators
-  await emulatorManager.stop();
-
-  console.log('✅ Firebase emulators stopped');
+  console.log('✅ Test run completed');
+  console.log('');
+  console.log('Note: Firebase emulators are still running.');
+  console.log('Stop them with Ctrl+C in the emulator terminal.');
 }
 
 export default globalTeardown;
