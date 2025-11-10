@@ -161,14 +161,17 @@ export default function PlaceOrder() {
       const orderRef = doc(ordersRef);
 
       // Regular client - use their own info
+      // Prioritize userProfile data over Firebase Auth displayName
+      const clientName = userProfile?.name || currentUser.displayName || currentUser.email || '';
+
       const orderData = {
         clientId: currentUser.uid,
-        clientName: currentUser.displayName || '',
+        clientName: clientName,
         clientEmail: currentUser.email || '',
         clientPhone: contactPhone || '',
         clientCompany: '',
         userId: currentUser.uid,
-        userName: currentUser.displayName || currentUser.email,
+        userName: clientName,
         userEmail: currentUser.email,
         status: OrderStatus.PENDING_CONFIRMATION,
         createdAt: timestamp,
@@ -205,7 +208,7 @@ export default function PlaceOrder() {
       batch.set(updateRef, {
         orderId: orderRef.id,
         userId: currentUser.uid,
-        userName: currentUser.displayName || currentUser.email,
+        userName: clientName,
         userEmail: currentUser.email,
         text: t('dashboard.orderModal.orderCreatedByClient'),
         isSystem: true,
