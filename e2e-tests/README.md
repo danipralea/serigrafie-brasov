@@ -13,8 +13,7 @@ The e2e testing infrastructure has already been installed. All dependencies are 
 1. Make sure Firebase emulators are installed:
 ```bash
 firebase setup:emulators:firestore
-firebase setup:emulators:auth
-firebase setup:emulators:storage
+# Note: Auth and Storage emulators are downloaded automatically
 ```
 
 ### Run Tests

@@ -128,11 +128,11 @@ This downloads the Chromium browser used for testing (~200MB).
 ### Step 4: Install Firebase Emulators
 
 ```bash
-# Install all required emulators
+# Install Firestore emulator (only one that requires setup)
 firebase setup:emulators:firestore
-firebase setup:emulators:auth
-firebase setup:emulators:storage
-firebase setup:emulators:functions  # Optional
+
+# Note: Auth, Storage, and Functions emulators are downloaded automatically
+# when you run firebase emulators:start
 ```
 
 This downloads the emulator binaries. Total size: ~100-200MB.
@@ -727,8 +727,6 @@ jobs:
         run: |
           npm install -g firebase-tools
           firebase setup:emulators:firestore
-          firebase setup:emulators:auth
-          firebase setup:emulators:storage
 
       - name: Run E2E Tests
         run: npm test
@@ -754,7 +752,6 @@ e2e-tests:
     - cd client && npm ci && cd ..
     - npm install -g firebase-tools
     - firebase setup:emulators:firestore
-    - firebase setup:emulators:auth
   script:
     - npm test
   artifacts:
@@ -989,7 +986,6 @@ You now have a complete e2e testing setup with:
 ```bash
 # Setup (first time)
 firebase setup:emulators:firestore
-firebase setup:emulators:auth
 npm install
 npx playwright install chromium
 

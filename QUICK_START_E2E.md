@@ -25,8 +25,7 @@ npx playwright install chromium
 
 # 4. Install Firebase emulators
 firebase setup:emulators:firestore
-firebase setup:emulators:auth
-firebase setup:emulators:storage
+# Note: Auth and Storage emulators don't require separate setup
 ```
 
 ## Running Tests
