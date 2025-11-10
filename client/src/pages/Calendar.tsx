@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
-import { collection, query, where, getDocs, onSnapshot, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, onSnapshot, Timestamp, doc, getDoc } from 'firebase/firestore';
 import { OrderStatus, ProductType } from '../types';
 import AppShell from '../components/AppShell';
+import OrderDetailsModal from '../components/OrderDetailsModal';
 import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 
 const PRODUCT_COLORS: { [key: string]: string } = {
@@ -36,6 +37,8 @@ export default function Calendar() {
   const [filterProduct, setFilterProduct] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [orders, setOrders] = useState<any[]>([]);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [showOrderModal, setShowOrderModal] = useState(false);
 
   useEffect(() => {
     if (!currentUser || !userProfile) return;
@@ -197,6 +200,37 @@ export default function Calendar() {
   const getStatusLabel = (status: string) => {
     return t(`orderStatus.${status}`) || status;
   };
+
+  async function openOrderDetails(orderId: string) {
+    try {
+      // Fetch the order
+      const orderRef = doc(db, 'orders', orderId);
+      const orderDoc = await getDoc(orderRef);
+
+      if (!orderDoc.exists()) return;
+
+      const orderData = {
+        id: orderDoc.id,
+        ...orderDoc.data()
+      };
+
+      // Fetch sub-orders
+      const subOrdersRef = collection(db, 'orders', orderId, 'subOrders');
+      const subOrdersSnapshot = await getDocs(subOrdersRef);
+      const subOrders = subOrdersSnapshot.docs.map(subDoc => ({
+        id: subDoc.id,
+        ...subDoc.data()
+      }));
+
+      setSelectedOrder({
+        ...orderData,
+        subOrders
+      });
+      setShowOrderModal(true);
+    } catch (error) {
+      console.error('Error fetching order:', error);
+    }
+  }
 
   const days = viewMode === 'week' ? getDaysInWeek() : getDaysInMonth();
   const monthYear = currentDate.toLocaleDateString('ro-RO', { month: 'long', year: 'numeric' });
@@ -361,7 +395,7 @@ export default function Calendar() {
                             key={subOrder.id}
                             onClick={(e) => {
                               e.stopPropagation();
-                              navigate('/dashboard', { state: { openOrderId: subOrder.parentOrderId } });
+                              openOrderDetails(subOrder.parentOrderId);
                             }}
                             className="text-xs rounded bg-white dark:bg-slate-700 hover:shadow-md transition-shadow cursor-pointer border-l-[3px] border border-gray-100 dark:border-gray-900 p-1.5"
                             style={{ borderLeftColor: productColor }}
@@ -395,6 +429,12 @@ export default function Calendar() {
           </div>
         </div>
       </div>
+
+      <OrderDetailsModal
+        isOpen={showOrderModal}
+        onClose={() => setShowOrderModal(false)}
+        order={selectedOrder}
+      />
     </AppShell>
   );
 }

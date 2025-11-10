@@ -74,6 +74,33 @@ service cloud.firestore {
       // Admins and team members can delete any order
       allow delete: if isAdminOrTeamMember();
 
+      // Sub-orders sub-collection
+      match /subOrders/{subOrderId} {
+        // Same read permissions as parent order
+        allow read: if isAuthenticated() && (
+          get(/databases/$(database)/documents/orders/$(orderId)).data.userId == request.auth.uid ||
+          isAdminOrTeamMember()
+        );
+
+        // Anyone who can create the order can create sub-orders
+        allow create: if isAuthenticated() && (
+          get(/databases/$(database)/documents/orders/$(orderId)).data.userId == request.auth.uid ||
+          isAdminOrTeamMember()
+        );
+
+        // Order owner or admins/team members can update sub-orders
+        allow update: if isAuthenticated() && (
+          get(/databases/$(database)/documents/orders/$(orderId)).data.userId == request.auth.uid ||
+          isAdminOrTeamMember()
+        );
+
+        // Order owner or admins/team members can delete sub-orders
+        allow delete: if isAuthenticated() && (
+          get(/databases/$(database)/documents/orders/$(orderId)).data.userId == request.auth.uid ||
+          isAdminOrTeamMember()
+        );
+      }
+
       // Order updates sub-collection
       match /orderUpdates/{updateId} {
         // Same read permissions as parent order
@@ -97,6 +124,30 @@ service cloud.firestore {
         // Only admins can delete updates
         allow delete: if isAdmin();
       }
+    }
+
+    // Order updates collection (top-level)
+    match /orderUpdates/{updateId} {
+      // Users can read updates for their own orders
+      allow read: if isAuthenticated() && (
+        get(/databases/$(database)/documents/orders/$(resource.data.orderId)).data.userId == request.auth.uid ||
+        isAdminOrTeamMember()
+      );
+
+      // Anyone who can read the order can add updates
+      allow create: if isAuthenticated() && (
+        get(/databases/$(database)/documents/orders/$(request.resource.data.orderId)).data.userId == request.auth.uid ||
+        isAdminOrTeamMember()
+      );
+
+      // Only the update creator or admins can update
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+
+      // Only admins can delete updates
+      allow delete: if isAdmin();
     }
 
     // Clients collection
@@ -133,18 +184,10 @@ service cloud.firestore {
 
     // Product types collection
     match /productTypes/{productTypeId} {
-      // Users can read their own product types
-      allow read: if isAuthenticated() &&
-                     resource.data.userId == request.auth.uid;
+      // All authenticated users can read product types (shared across organization)
+      allow read: if isAuthenticated();
 
-      // Team members can read product types from their team owner
-      allow read: if isAuthenticated() &&
-                     resource.data.userId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamOwnerId;
-
-      // Admins and team members can read all product types
-      allow read: if isAdminOrTeamMember();
-
-      // Users can create product types (they become the owner)
+      // All authenticated users can create product types
       allow create: if isAuthenticated() &&
                        request.resource.data.userId == request.auth.uid;
 
@@ -209,6 +252,33 @@ service cloud.firestore {
         resource.data.invitedBy == request.auth.uid ||
         isAdmin()
       );
+    }
+
+    // Notifications collection
+    match /notifications/{notificationId} {
+      // Users can read their own notifications
+      allow read: if isAuthenticated() &&
+                     resource.data.userId == request.auth.uid;
+
+      // Admins can read all notifications
+      allow read: if isAdmin();
+
+      // Authenticated users can create notifications
+      allow create: if isAuthenticated();
+
+      // Users can update their own notifications (e.g., mark as read)
+      allow update: if isAuthenticated() &&
+                       resource.data.userId == request.auth.uid;
+
+      // Admins can update all notifications
+      allow update: if isAdmin();
+
+      // Users can delete their own notifications
+      allow delete: if isAuthenticated() &&
+                       resource.data.userId == request.auth.uid;
+
+      // Admins can delete all notifications
+      allow delete: if isAdmin();
     }
 
     // Deny all other access

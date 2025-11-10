@@ -264,6 +264,7 @@
     "errorDeliveryTimeRequired": "Data și ora livrării este obligatorie"
   },
   "orderStatus": {
+    "pending_confirmation": "așteaptă confirmare",
     "pending": "în așteptare",
     "in_progress": "în lucru",
     "completed": "finalizat",

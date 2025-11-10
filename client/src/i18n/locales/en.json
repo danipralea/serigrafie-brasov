@@ -275,6 +275,7 @@
     }
   },
   "orderStatus": {
+    "pending_confirmation": "pending confirmation",
     "pending": "pending",
     "in_progress": "in progress",
     "completed": "completed",

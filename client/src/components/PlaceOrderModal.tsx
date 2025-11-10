@@ -1,440 +1,432 @@
-import { useState, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
-import { db } from '../firebase';
-import { collection, addDoc, Timestamp, query, where, getDocs } from 'firebase/firestore';
-import { ProductType, OrderStatus } from '../types';
-import { showSuccess } from '../services/notificationService';
-import AuthModal from './AuthModal';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
-import { PhotoIcon, XMarkIcon } from '@heroicons/react/24/solid';
-import { ChevronDownIcon } from '@heroicons/react/16/solid';
+import { XMarkIcon } from '@heroicons/react/24/outline';
+import { PlusIcon } from '@heroicons/react/20/solid';
+import { db } from '../firebase';
+import { collection, Timestamp, writeBatch, doc } from 'firebase/firestore';
+import { OrderStatus } from '../types';
+import ClientAutocomplete from './ClientAutocomplete';
+import SubOrderItem, { SubOrderData } from './SubOrderItem';
+
+interface Client {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  company?: string;
+}
 
 interface PlaceOrderModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess: (order?: any) => void;
-  initialData?: any;
 }
 
-export default function PlaceOrderModal({ open, onClose, onSuccess, initialData }: PlaceOrderModalProps) {
-  const { currentUser } = useAuth();
+export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrderModalProps) {
+  const { currentUser, userProfile } = useAuth();
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [pendingSubmit, setPendingSubmit] = useState(false);
-  const [formData, setFormData] = useState({
-    productType: initialData?.productType || ProductType.MUGS,
-    quantity: initialData?.quantity?.toString() || '',
-    length: initialData?.length?.toString() || '',
-    width: initialData?.width?.toString() || '',
-    cmp: initialData?.cmp?.toString() || '',
-    description: initialData?.description || '',
-    designFile: initialData?.designFile || '',
-    deliveryTime: initialData?.deliveryTime || '',
-    contactPhone: initialData?.contactPhone || '',
-    notes: initialData?.notes || ''
-  });
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Clear error when user authenticates and submit order if pending
+  // Parent order data
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [contactPhone, setContactPhone] = useState('');
+  const [clientError, setClientError] = useState('');
+
+  // Clear errors when modal opens
   useEffect(() => {
-    if (currentUser && pendingSubmit) {
+    if (open) {
       setError('');
-      setPendingSubmit(false);
-      submitOrder();
+      setClientError('');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser, pendingSubmit]);
+  }, [open]);
 
-  function handleChange(e) {
-    const { name, value } = e.target;
-    setFormData(prev => ({
+  // Scroll to top when error is set
+  useEffect(() => {
+    if (error && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [error]);
+
+  // Sub-orders state
+  const [subOrders, setSubOrders] = useState<SubOrderData[]>([
+    {
+      id: crypto.randomUUID(),
+      productType: null,
+      quantity: '',
+      length: '',
+      width: '',
+      cmp: '',
+      description: '',
+      designFile: '',
+      deliveryTime: '',
+      notes: ''
+    }
+  ]);
+
+  function handleSubOrderChange(id: string, field: string, value: any) {
+    setSubOrders(prev =>
+      prev.map(so => (so.id === id ? { ...so, [field]: value } : so))
+    );
+  }
+
+  function handleAddSubOrder() {
+    setSubOrders(prev => [
       ...prev,
-      [name]: value
-    }));
-  }
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-
-    if (!formData.quantity) {
-      setError(t('placeOrder.errorRequired'));
-      return;
-    }
-
-    // Check if user is authenticated
-    if (!currentUser) {
-      setShowAuthModal(true);
-      setPendingSubmit(true); // Mark that we want to submit after auth
-      return;
-    }
-
-    await submitOrder();
-  }
-
-  function handleAuthSuccess() {
-    setShowAuthModal(false);
-    setError(''); // Clear any previous errors
-    // The useEffect will handle submitting when currentUser updates
-  }
-
-  async function submitOrder() {
-    if (!currentUser) {
-      setError('Please authenticate to submit order');
-      return;
-    }
-
-    try {
-      setError('');
-      setLoading(true);
-
-      const ordersRef = collection(db, 'orders');
-
-      const orderDoc = await addDoc(ordersRef, {
-        ...formData,
-        quantity: parseInt(formData.quantity),
-        length: formData.length ? parseFloat(formData.length) : null,
-        width: formData.width ? parseFloat(formData.width) : null,
-        cmp: formData.cmp ? parseFloat(formData.cmp) : null,
-        userId: currentUser.uid,
-        userEmail: currentUser.email,
-        userName: currentUser.displayName || currentUser.email,
-        status: OrderStatus.PENDING_CONFIRMATION,
-        confirmedByClient: false,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now()
-      });
-
-
-      showSuccess('Comandă creată cu succes!');
-
-      // Create the order object to return
-      const createdOrder = {
-        id: orderDoc.id,
-        ...formData,
-        quantity: parseInt(formData.quantity),
-        length: formData.length ? parseFloat(formData.length) : null,
-        width: formData.width ? parseFloat(formData.width) : null,
-        cmp: formData.cmp ? parseFloat(formData.cmp) : null,
-        userId: currentUser.uid,
-        userEmail: currentUser.email,
-        userName: currentUser.displayName || currentUser.email,
-        status: OrderStatus.PENDING_CONFIRMATION,
-        confirmedByClient: false,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now()
-      };
-
-      // Reset form
-      setFormData({
-        productType: ProductType.MUGS,
+      {
+        id: crypto.randomUUID(),
+        productType: null,
         quantity: '',
         length: '',
         width: '',
         cmp: '',
         description: '',
         designFile: '',
-        deadline: '',
-        contactPhone: '',
+        deliveryTime: '',
         notes: ''
+      }
+    ]);
+  }
+
+  function handleRemoveSubOrder(id: string) {
+    setSubOrders(prev => prev.filter(so => so.id !== id));
+  }
+
+  function validateForm(): boolean {
+    // Validate client (only for admin/team members)
+    const isAdminOrTeam = userProfile?.isAdmin || userProfile?.isTeamMember;
+    if (isAdminOrTeam && !selectedClient) {
+      setClientError(t('order.errorClientRequired'));
+      return false;
+    }
+    setClientError('');
+
+    // Validate at least one sub-order
+    if (subOrders.length === 0) {
+      setError(t('order.errorAtLeastOneSubOrder'));
+      return false;
+    }
+
+    // Validate each sub-order
+    for (let i = 0; i < subOrders.length; i++) {
+      const so = subOrders[i];
+
+      if (!so.productType) {
+        setError(`${t('order.subOrderItem')} #${i + 1}: ${t('order.errorProductTypeRequired')}`);
+        return false;
+      }
+
+      if (!so.quantity || parseInt(so.quantity) <= 0) {
+        setError(`${t('order.subOrderItem')} #${i + 1}: ${t('order.errorQuantityRequired')}`);
+        return false;
+      }
+
+      if (!so.deliveryTime || !so.deliveryTime.trim()) {
+        setError(`${t('order.subOrderItem')} #${i + 1}: ${t('order.errorDeliveryTimeRequired')}`);
+        return false;
+      }
+    }
+
+    setError('');
+    return true;
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (!validateForm() || !currentUser) return;
+
+    // For regular clients, use their own info as the client
+    const isAdminOrTeam = userProfile?.isAdmin || userProfile?.isTeamMember;
+    let clientData;
+
+    if (isAdminOrTeam) {
+      // Admin/Team must select a client
+      if (!selectedClient) return;
+      clientData = {
+        clientId: selectedClient.id,
+        clientName: selectedClient.name,
+        clientEmail: selectedClient.email || '',
+        clientPhone: selectedClient.phone || contactPhone,
+        clientCompany: selectedClient.company || ''
+      };
+    } else {
+      // Regular client - use their own info
+      clientData = {
+        clientId: currentUser.uid,
+        clientName: currentUser.displayName || '',
+        clientEmail: currentUser.email || '',
+        clientPhone: contactPhone || '',
+        clientCompany: ''
+      };
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+
+      // Use batch write for atomic operations
+      const batch = writeBatch(db);
+      const timestamp = Timestamp.now();
+
+      // Create parent order reference
+      const ordersRef = collection(db, 'orders');
+      const orderRef = doc(ordersRef);
+
+      const orderData = {
+        ...clientData,
+        userId: currentUser.uid,
+        userName: currentUser.displayName || currentUser.email,
+        userEmail: currentUser.email,
+        status: userProfile?.isAdmin || userProfile?.isTeamMember
+          ? OrderStatus.PENDING
+          : OrderStatus.PENDING_CONFIRMATION,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      };
+
+      batch.set(orderRef, orderData);
+
+      // Create sub-orders in subcollection
+      subOrders.forEach((so) => {
+        const subOrderRef = doc(collection(db, 'orders', orderRef.id, 'subOrders'));
+        const subOrderData = {
+          productType: so.productType?.id || '',
+          productTypeName: so.productType?.name || '',
+          productTypeCustom: so.productType?.isCustom || false,
+          quantity: parseInt(so.quantity),
+          length: so.length ? parseFloat(so.length) : null,
+          width: so.width ? parseFloat(so.width) : null,
+          cmp: so.cmp ? parseFloat(so.cmp) : null,
+          description: so.description,
+          designFile: so.designFile || '',
+          designFilePath: so.designFilePath || '',
+          deliveryTime: so.deliveryTime || null,
+          notes: so.notes || '',
+          status: OrderStatus.PENDING,
+          createdAt: timestamp,
+          updatedAt: timestamp
+        };
+        batch.set(subOrderRef, subOrderData);
       });
 
-      // Call success and close callbacks with the created order
-      onSuccess(createdOrder);
+      // Create initial order update
+      const updateRef = doc(collection(db, 'orderUpdates'));
+      batch.set(updateRef, {
+        orderId: orderRef.id,
+        userId: currentUser.uid,
+        userName: currentUser.displayName || currentUser.email,
+        userEmail: currentUser.email,
+        text: userProfile?.isAdmin || userProfile?.isTeamMember
+          ? t('dashboard.orderModal.orderCreatedByTeam')
+          : t('dashboard.orderModal.orderCreatedByClient'),
+        isSystem: true,
+        createdAt: timestamp
+      });
+
+      // Commit all writes atomically
+      await batch.commit();
+
+      // Reset form
+      setSelectedClient(null);
+      setContactPhone('');
+      setSubOrders([
+        {
+          id: crypto.randomUUID(),
+          productType: null,
+          quantity: '',
+          length: '',
+          width: '',
+          cmp: '',
+          description: '',
+          designFile: '',
+          deliveryTime: '',
+          notes: ''
+        }
+      ]);
+
+      onSuccess({ id: orderRef.id, ...orderData });
       onClose();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error creating order:', err);
-      setError('Failed to create order. Please try again.');
+
+      // Provide human-readable error messages
+      let errorMessage = t('placeOrder.orderFailed');
+
+      if (err?.code === 'permission-denied' || err?.message?.includes('permission')) {
+        errorMessage = t('placeOrder.errorPermissionDenied');
+      } else if (err?.code === 'unavailable' || err?.message?.includes('network')) {
+        errorMessage = t('placeOrder.errorNetworkIssue');
+      } else if (err?.message) {
+        // For development - show actual error
+        errorMessage = `${t('placeOrder.orderFailed')}: ${err.message}`;
+      }
+
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
   }
 
-  function handleClose() {
-    if (!loading) {
-      onClose();
-    }
-  }
-
   return (
-    <>
-      <Dialog open={open} onClose={handleClose} className="relative z-50">
-        {/* Backdrop */}
-        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm" aria-hidden="true" />
+    <Dialog open={open} onClose={onClose} className="relative z-50">
+      <div className="fixed inset-0 bg-black/30 dark:bg-black/50" aria-hidden="true" />
 
-        {/* Full-screen container to center the panel */}
-        <div className="fixed inset-0 flex items-center justify-center p-4">
-          <DialogPanel className="mx-auto max-w-4xl w-full bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 max-h-[90vh] overflow-y-auto">
-            {/* Header */}
-            <div className="sticky top-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6 py-4 flex justify-between items-center z-10">
-              <DialogTitle className="text-lg font-semibold text-slate-900 dark:text-white">
-                {t('placeOrder.title')}
-              </DialogTitle>
-              <div className="flex items-center gap-3">
+      <div className="fixed inset-0 flex w-screen items-center justify-center p-4">
+        <DialogPanel ref={scrollContainerRef} className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl bg-white dark:bg-slate-800 shadow-2xl">
+          {/* Header */}
+          <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-6 py-4">
+            <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">
+              {t('order.createNewOrder')}
+            </DialogTitle>
+            <div className="flex items-center gap-3">
+              <button
+                type="submit"
+                form="order-form"
+                disabled={loading}
+                className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-cyan-500 rounded-md hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+              >
+                {loading ? t('placeOrder.submitting') : t('order.createOrder')}
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-md p-1 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            </div>
+          </div>
+
+          {/* Form */}
+          <form id="order-form" onSubmit={handleSubmit} className="px-6 py-6">
+            {/* Error Message */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-md">
+                <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+              </div>
+            )}
+
+            {/* Client Section - Only for Admin/Team Members */}
+            {(userProfile?.isAdmin || userProfile?.isTeamMember) && (
+              <div className="mb-6">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">
+                  {t('order.clientInformation')}
+                </h3>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
+                      {t('order.client')} *
+                    </label>
+                    <ClientAutocomplete
+                      selectedClient={selectedClient}
+                      onSelectClient={setSelectedClient}
+                      error={clientError}
+                    />
+                  </div>
+
+                  {selectedClient && (
+                    <div className="relative p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-md">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedClient(null)}
+                        className="absolute top-2 right-2 p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-800/50 rounded transition-colors"
+                        aria-label="Remove client"
+                      >
+                        <XMarkIcon className="h-4 w-4" />
+                      </button>
+                      <div className="text-sm text-blue-900 dark:text-blue-200 pr-6">
+                        <strong>{selectedClient.name}</strong>
+                        {selectedClient.company && <span className="ml-2">• {selectedClient.company}</span>}
+                        {selectedClient.email && (
+                          <div className="mt-1 text-blue-700 dark:text-blue-300">
+                            {selectedClient.email}
+                          </div>
+                        )}
+                        {selectedClient.phone && (
+                          <div className="mt-1 text-blue-700 dark:text-blue-300">
+                            {selectedClient.phone}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Optional: Override contact phone */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
+                      {t('order.contactPhone')} {t('common.optional')}
+                    </label>
+                    <input
+                      type="tel"
+                      value={contactPhone}
+                      onChange={(e) => setContactPhone(e.target.value)}
+                      placeholder={t('placeOrder.phonePlaceholder')}
+                      className="block w-full sm:max-w-md rounded-md bg-white dark:bg-slate-700 px-3 py-2 text-sm text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 transition-colors"
+                    />
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      {t('order.contactPhoneHelp')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Contact Phone for Regular Clients */}
+            {!userProfile?.isAdmin && !userProfile?.isTeamMember && (
+              <div className="mb-6">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">
+                  {t('order.contactPhone')}
+                </h3>
+                <input
+                  type="tel"
+                  value={contactPhone}
+                  onChange={(e) => setContactPhone(e.target.value)}
+                  placeholder={t('placeOrder.phonePlaceholder')}
+                  className="block w-full sm:max-w-md rounded-md bg-white dark:bg-slate-700 px-3 py-2 text-sm text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 transition-colors"
+                />
+              </div>
+            )}
+
+            {/* Divider */}
+            <div className="border-t border-gray-200 dark:border-slate-700 my-6"></div>
+
+            {/* Sub-Orders Section */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                  {t('order.orderItems')}
+                </h3>
                 <button
-                  type="submit"
-                  form="place-order-form"
-                  disabled={loading}
-                  className="inline-flex justify-center rounded-md bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-2 text-sm font-semibold text-white shadow-xs hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity focus:outline-none"
+                  type="button"
+                  onClick={handleAddSubOrder}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-md transition-colors"
                 >
-                  {loading ? t('placeOrder.submitting') : t('placeOrder.submit')}
-                </button>
-                <button
-                  onClick={handleClose}
-                  disabled={loading}
-                  className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors disabled:opacity-50"
-                >
-                  <XMarkIcon className="w-6 h-6" />
+                  <PlusIcon className="w-5 h-5" />
+                  {t('order.addItem')}
                 </button>
               </div>
+
+              <div className="space-y-4">
+                {subOrders.map((subOrder, index) => (
+                  <SubOrderItem
+                    key={subOrder.id}
+                    subOrder={subOrder}
+                    index={index}
+                    onChange={handleSubOrderChange}
+                    onRemove={handleRemoveSubOrder}
+                    canRemove={subOrders.length > 1}
+                  />
+                ))}
+              </div>
             </div>
-
-            {/* Content */}
-            <div className="px-6 py-6">
-              <p className="mb-6 text-sm/6 text-slate-600 dark:text-slate-300 transition-colors">
-                {t('placeOrder.subtitle')}
-              </p>
-
-              {error && (
-                <div className="mb-6 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 rounded-lg p-4 text-sm transition-colors">
-                  {error}
-                </div>
-              )}
-
-              <form id="place-order-form" onSubmit={handleSubmit}>
-                <div className="space-y-8 pb-12 sm:space-y-0 sm:divide-y sm:divide-slate-200 dark:sm:divide-slate-700 sm:border-t sm:border-t-slate-200 dark:sm:border-t-slate-700 sm:pb-0 transition-colors">
-                  {/* Product Type */}
-                  <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                    <label htmlFor="productType" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                      {t('placeOrder.productType')} *
-                    </label>
-                    <div className="mt-2 sm:col-span-2 sm:mt-0">
-                      <div className="grid grid-cols-1 sm:max-w-md">
-                        <select
-                          id="productType"
-                          name="productType"
-                          value={formData.productType}
-                          onChange={handleChange}
-                          required
-                          className="col-start-1 row-start-1 w-full appearance-none rounded-md bg-white dark:bg-slate-700 py-1.5 pr-8 pl-3 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:text-sm/6 transition-colors"
-                        >
-                          <option value={ProductType.MUGS}>{t('placeOrder.products.mugs')}</option>
-                          <option value={ProductType.T_SHIRTS}>{t('placeOrder.products.tshirts')}</option>
-                          <option value={ProductType.HOODIES}>{t('placeOrder.products.hoodies')}</option>
-                          <option value={ProductType.BAGS}>{t('placeOrder.products.bags')}</option>
-                          <option value={ProductType.CAPS}>{t('placeOrder.products.caps')}</option>
-                          <option value={ProductType.OTHER}>{t('placeOrder.products.other')}</option>
-                        </select>
-                        <ChevronDownIcon
-                          aria-hidden="true"
-                          className="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-gray-500 dark:text-slate-400 sm:size-4 transition-colors"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Quantity */}
-                  <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                    <label htmlFor="quantity" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                      {t('placeOrder.quantity')} *
-                    </label>
-                    <div className="mt-2 sm:col-span-2 sm:mt-0">
-                      <input
-                        type="number"
-                        id="quantity"
-                        name="quantity"
-                        min="1"
-                        value={formData.quantity}
-                        onChange={handleChange}
-                        required
-                        placeholder={t('placeOrder.quantityPlaceholder')}
-                        className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-xs sm:text-sm/6 transition-colors"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Length */}
-                  <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                    <label htmlFor="length" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                      {t('placeOrder.length')}
-                    </label>
-                    <div className="mt-2 sm:col-span-2 sm:mt-0">
-                      <input
-                        type="number"
-                        id="length"
-                        name="length"
-                        min="0"
-                        step="0.01"
-                        value={formData.length}
-                        onChange={handleChange}
-                        placeholder={t('placeOrder.lengthPlaceholder')}
-                        className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-xs sm:text-sm/6 transition-colors"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Width */}
-                  <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                    <label htmlFor="width" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                      {t('placeOrder.width')}
-                    </label>
-                    <div className="mt-2 sm:col-span-2 sm:mt-0">
-                      <input
-                        type="number"
-                        id="width"
-                        name="width"
-                        min="0"
-                        step="0.01"
-                        value={formData.width}
-                        onChange={handleChange}
-                        placeholder={t('placeOrder.widthPlaceholder')}
-                        className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-xs sm:text-sm/6 transition-colors"
-                      />
-                    </div>
-                  </div>
-
-                  {/* CMP (Cost/Price per unit) */}
-                  <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                    <label htmlFor="cmp" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                      {t('placeOrder.cmp')}
-                    </label>
-                    <div className="mt-2 sm:col-span-2 sm:mt-0">
-                      <input
-                        type="number"
-                        id="cmp"
-                        name="cmp"
-                        min="0"
-                        step="0.01"
-                        value={formData.cmp}
-                        onChange={handleChange}
-                        placeholder={t('placeOrder.cmpPlaceholder')}
-                        className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-xs sm:text-sm/6 transition-colors"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Description */}
-                  <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                    <label htmlFor="description" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                      {t('placeOrder.description')}
-                    </label>
-                    <div className="mt-2 sm:col-span-2 sm:mt-0">
-                      <textarea
-                        id="description"
-                        name="description"
-                        rows={4}
-                        value={formData.description}
-                        onChange={handleChange}
-                        placeholder={t('placeOrder.descriptionPlaceholder')}
-                        className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-2xl sm:text-sm/6 transition-colors"
-                      />
-                      <p className="mt-3 text-sm/6 text-slate-600 dark:text-slate-300 transition-colors">{t('placeOrder.descriptionHelp')}</p>
-                    </div>
-                  </div>
-
-                  {/* Design File */}
-                  <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                    <label htmlFor="designFile" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                      {t('placeOrder.designFile')}
-                    </label>
-                    <div className="mt-2 sm:col-span-2 sm:mt-0">
-                      <div className="flex max-w-2xl justify-center rounded-lg border border-dashed border-slate-300 dark:border-slate-600 px-6 py-10 transition-colors">
-                        <div className="text-center">
-                          <PhotoIcon aria-hidden="true" className="mx-auto size-12 text-slate-300 dark:text-slate-600 transition-colors" />
-                          <div className="mt-4 flex text-sm/6 text-slate-600 dark:text-slate-300 transition-colors">
-                            <label
-                              htmlFor="file-upload"
-                              className="relative cursor-pointer rounded-md bg-transparent font-semibold text-blue-600 dark:text-blue-400 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-blue-500 hover:text-blue-500 dark:hover:text-blue-300 transition-colors"
-                            >
-                              <span>{t('placeOrder.uploadFile')}</span>
-                              <input id="file-upload" name="file-upload" type="file" className="sr-only" />
-                            </label>
-                            <p className="pl-1">{t('placeOrder.dragDrop')}</p>
-                          </div>
-                          <p className="text-xs/5 text-slate-600 dark:text-slate-400 transition-colors">{t('placeOrder.fileTypes')}</p>
-                          <div className="mt-4">
-                            <input
-                              type="url"
-                              id="designFile"
-                              name="designFile"
-                              value={formData.designFile}
-                              onChange={handleChange}
-                              placeholder={t('placeOrder.designFileUrl')}
-                              className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-sm text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 transition-colors"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Delivery Time */}
-                  <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                    <label htmlFor="deliveryTime" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                      {t('placeOrder.deliveryTime')}
-                    </label>
-                    <div className="mt-2 sm:col-span-2 sm:mt-0">
-                      <input
-                        type="datetime-local"
-                        id="deliveryTime"
-                        name="deliveryTime"
-                        value={formData.deliveryTime}
-                        onChange={handleChange}
-                        min={new Date().toISOString().slice(0, 16)}
-                        className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-md sm:text-sm/6 transition-colors [&::-webkit-calendar-picker-indicator]:dark:invert"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Contact Phone */}
-                  <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                    <label htmlFor="contactPhone" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                      {t('placeOrder.contactPhone')}
-                    </label>
-                    <div className="mt-2 sm:col-span-2 sm:mt-0">
-                      <input
-                        type="tel"
-                        id="contactPhone"
-                        name="contactPhone"
-                        value={formData.contactPhone}
-                        onChange={handleChange}
-                        placeholder="+40 xxx xxx xxx"
-                        className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-md sm:text-sm/6 transition-colors"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Additional Notes */}
-                  <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                    <label htmlFor="notes" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                      {t('placeOrder.notes')}
-                    </label>
-                    <div className="mt-2 sm:col-span-2 sm:mt-0">
-                      <textarea
-                        id="notes"
-                        name="notes"
-                        rows={3}
-                        value={formData.notes}
-                        onChange={handleChange}
-                        placeholder={t('placeOrder.notesPlaceholder')}
-                        className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-2xl sm:text-sm/6 transition-colors"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </form>
-            </div>
-          </DialogPanel>
-        </div>
-      </Dialog>
-
-      {/* Authentication Modal */}
-      <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        onSuccess={handleAuthSuccess}
-      />
-    </>
+          </form>
+        </DialogPanel>
+      </div>
+    </Dialog>
   );
 }
