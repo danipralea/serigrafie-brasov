@@ -109,10 +109,8 @@ export default function AcceptInvitation() {
       // Handle specific error cases
       if (err.code === 'auth/popup-closed-by-user') {
         // User closed the popup - don't show error, just reset loading
-        console.log('User cancelled Google login');
       } else if (err.code === 'auth/cancelled-popup-request') {
         // Multiple popups opened - don't show error
-        console.log('Popup request cancelled');
       } else {
         // Show error for actual failures
         setError(t('acceptInvitation.failedToAccept'));

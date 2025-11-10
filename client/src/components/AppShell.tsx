@@ -122,6 +122,7 @@ export default function AppShell({ children, title }: { children: React.ReactNod
 
   const navigation = [
     { name: t('nav.orders'), href: '/dashboard', current: location.pathname === '/dashboard' },
+    { name: t('nav.calendar'), href: '/calendar', current: location.pathname === '/calendar' },
     ...(userProfile?.isAdmin || userProfile?.isTeamMember
       ? [
           { name: t('nav.clients'), href: '/clients', current: location.pathname === '/clients' },

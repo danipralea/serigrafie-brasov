@@ -5,6 +5,7 @@ import PrivateRoute from './components/PrivateRoute';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import Calendar from './pages/Calendar';
 import PlaceOrder from './pages/PlaceOrder';
 import Profile from './pages/Profile';
 import AcceptInvitation from './pages/AcceptInvitation';
@@ -25,6 +26,14 @@ function App() {
             element={
               <PrivateRoute>
                 <Dashboard />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/calendar"
+            element={
+              <PrivateRoute>
+                <Calendar />
               </PrivateRoute>
             }
           />

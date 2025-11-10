@@ -28,7 +28,7 @@ export default function PlaceOrder() {
     cmp: '',
     description: '',
     designFile: '',
-    deadline: '',
+    deliveryTime: '',
     contactPhone: '',
     notes: ''
   });
@@ -327,20 +327,20 @@ export default function PlaceOrder() {
                   </div>
                 </div>
 
-                {/* Deadline */}
+                {/* Delivery Time */}
                 <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                  <label htmlFor="deadline" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                    {t('placeOrder.deadline')}
+                  <label htmlFor="deliveryTime" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
+                    {t('placeOrder.deliveryTime')}
                   </label>
                   <div className="mt-2 sm:col-span-2 sm:mt-0">
                     <input
-                      type="date"
-                      id="deadline"
-                      name="deadline"
-                      value={formData.deadline}
+                      type="datetime-local"
+                      id="deliveryTime"
+                      name="deliveryTime"
+                      value={formData.deliveryTime}
                       onChange={handleChange}
-                      min={new Date().toISOString().split('T')[0]}
-                      className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-xs sm:text-sm/6 transition-colors [color-scheme:light] dark:[color-scheme:dark]"
+                      min={new Date().toISOString().slice(0, 16)}
+                      className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-md sm:text-sm/6 transition-colors [color-scheme:light] dark:[color-scheme:dark]"
                     />
                   </div>
                 </div>
@@ -595,20 +595,20 @@ export default function PlaceOrder() {
                   </div>
                 </div>
 
-                {/* Deadline */}
+                {/* Delivery Time */}
                 <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                  <label htmlFor="deadline" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                    {t('placeOrder.deadline')}
+                  <label htmlFor="deliveryTime" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
+                    {t('placeOrder.deliveryTime')}
                   </label>
                   <div className="mt-2 sm:col-span-2 sm:mt-0">
                     <input
-                      type="date"
-                      id="deadline"
-                      name="deadline"
-                      value={formData.deadline}
+                      type="datetime-local"
+                      id="deliveryTime"
+                      name="deliveryTime"
+                      value={formData.deliveryTime}
                       onChange={handleChange}
-                      min={new Date().toISOString().split('T')[0]}
-                      className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-xs sm:text-sm/6 transition-colors [color-scheme:light] dark:[color-scheme:dark]"
+                      min={new Date().toISOString().slice(0, 16)}
+                      className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-md sm:text-sm/6 transition-colors [color-scheme:light] dark:[color-scheme:dark]"
                     />
                   </div>
                 </div>

@@ -17,7 +17,10 @@
     "back": "Înapoi",
     "next": "Înainte",
     "required": "Obligatoriu",
-    "showDetails": "Vezi detalii"
+    "showDetails": "Vezi detalii",
+    "or": "sau",
+    "custom": "Personalizat",
+    "optional": "(opțional)"
   },
   "auth": {
     "signIn": "Autentificare",
@@ -58,7 +61,7 @@
     "resetPasswordDesc": "Introdu adresa ta de email și îți vom trimite un link pentru resetarea parolei",
     "sendResetLink": "Trimite link de resetare",
     "backToLogin": "Înapoi la autentificare",
-    "resetEmailSent": "Email de resetare trimis! Verifică inbox-ul.",
+    "resetEmailSent": "Email de resetare trimis! Verifică inbox-ul și dosarul spam/junk.",
     "resetEmailError": "Eroare la trimiterea emailului de resetare"
   },
   "phoneAuth": {
@@ -105,6 +108,7 @@
   },
   "nav": {
     "orders": "Comenzi",
+    "calendar": "Calendar",
     "clients": "Clienți",
     "team": "Echipă",
     "placeOrder": "Comandă nouă",
@@ -112,6 +116,26 @@
     "admin": "Administrare",
     "profile": "Profil",
     "signOut": "Deconectare"
+  },
+  "calendar": {
+    "title": "Calendar comenzi",
+    "month": "Lună",
+    "week": "Săptămână",
+    "today": "Astăzi",
+    "allProducts": "Toate produsele",
+    "allStatuses": "Toate statusurile",
+    "statusPendingConfirmation": "Așteaptă confirmare",
+    "statusPending": "Confirmat",
+    "statusInProgress": "În producție",
+    "statusCompleted": "Finalizat",
+    "statusCancelled": "Anulat",
+    "mon": "Lun",
+    "tue": "Mar",
+    "wed": "Mie",
+    "thu": "Joi",
+    "fri": "Vin",
+    "sat": "Sâm",
+    "sun": "Dum"
   },
   "dashboard": {
     "title": "Comenzile tale",
@@ -134,6 +158,8 @@
       "product": "Produs",
       "allProducts": "Toate produsele",
       "sortBy": "Sortează după",
+      "deliveryEarliest": "Livrare (Cele mai apropiate)",
+      "deliveryLatest": "Livrare (Cele mai îndepărtate)",
       "dateNewest": "Dată (Cele mai noi)",
       "dateOldest": "Dată (Cele mai vechi)",
       "quantityHigh": "Cantitate (Mare spre mic)",
@@ -143,6 +169,11 @@
     },
     "table": {
       "orderId": "ID comandă",
+      "client": "Client",
+      "items": "Articole",
+      "item": "Articol",
+      "pcs": "buc",
+      "delivery": "Livrare",
       "product": "Produs",
       "quantity": "Cantitate",
       "status": "Status",
@@ -165,7 +196,7 @@
       "status": "Status",
       "product": "Produs",
       "quantity": "Cantitate",
-      "deadline": "Termen limită",
+      "deliveryTime": "Dată livrare",
       "phone": "Telefon",
       "description": "Descriere",
       "notes": "Notițe",
@@ -197,6 +228,8 @@
       "system": "Sistem",
       "statusChangedTo": "Status comandă schimbat la:",
       "orderConfirmedByClient": "Comandă confirmată de client. Gata de procesare.",
+      "orderCreatedByTeam": "Comandă creată de echipă",
+      "orderCreatedByClient": "Comandă creată de client",
       "statuses": {
         "pendingConfirmation": "Așteaptă confirmare",
         "confirmed": "Confirmată",
@@ -205,6 +238,27 @@
         "cancelled": "Anulată"
       }
     }
+  },
+  "order": {
+    "createNewOrder": "Creează comandă nouă",
+    "clientInformation": "Informații client",
+    "client": "Client",
+    "clientPlaceholder": "Caută un client...",
+    "addNewClient": "Adaugă client nou",
+    "orderItems": "Articole comandă",
+    "addItem": "Adaugă articol",
+    "subOrderItem": "Articol",
+    "removeSubOrder": "Șterge articol",
+    "contactPhone": "Telefon contact",
+    "contactPhoneHelp": "Lasă gol pentru a folosi numărul de telefon al clientului",
+    "createOrder": "Creează comandă",
+    "productTypePlaceholder": "Caută un tip de produs...",
+    "addNewProductType": "Adaugă tip de produs nou",
+    "errorClientRequired": "Te rugăm să selectezi un client",
+    "errorAtLeastOneSubOrder": "Te rugăm să adaugi cel puțin un articol",
+    "errorProductTypeRequired": "Tipul de produs este obligatoriu",
+    "errorQuantityRequired": "Cantitatea este obligatorie și trebuie să fie mai mare de 0",
+    "errorDeliveryTimeRequired": "Data și ora livrării este obligatorie"
   },
   "orderStatus": {
     "pending": "în așteptare",
@@ -215,10 +269,21 @@
   "productType": {
     "mugs": "Căni",
     "t-shirts": "Tricouri",
+    "tshirts": "Tricouri",
     "hoodies": "Hanorace",
     "bags": "Genți",
     "caps": "Șepci",
-    "other": "Altele"
+    "other": "Altele",
+    "name": "Nume produs",
+    "namePlaceholder": "ex. Căni ceramice",
+    "description": "Descriere",
+    "descriptionPlaceholder": "Descriere opțională...",
+    "add": "Adaugă tip de produs",
+    "adding": "Se adaugă...",
+    "adminOnly": "Doar administratorii și membrii echipei pot adăuga tipuri noi de produse",
+    "addSuccess": "Tip de produs adăugat cu succes",
+    "errorName": "Numele produsului este obligatoriu",
+    "errorFailed": "Eroare la adăugarea tipului de produs. Te rugăm să încerci din nou."
   },
   "placeOrder": {
     "title": "Detalii comandă",
@@ -244,7 +309,7 @@
     "designFilePlaceholder": "https://example.com/design.png",
     "designFileHelp": "Oferă un link către fișierul tău de design (Google Drive, Dropbox, etc.) sau încarcă mai jos",
     "uploadDesign": "Încarcă design",
-    "deadline": "Termen limită preferat",
+    "deliveryTime": "Dată și oră livrare",
     "contactPhone": "Telefon contact",
     "phonePlaceholder": "+40 xxx xxx xxx",
     "notes": "Notițe adiționale",
@@ -257,6 +322,11 @@
     "fillAllFields": "Te rugăm să completezi toate câmpurile obligatorii",
     "orderCreated": "Comandă creată cu succes!",
     "orderFailed": "Eroare la crearea comenzii. Te rugăm să încerci din nou.",
+    "clickToUpload": "Click pentru încărcare",
+    "uploading": "Se încarcă...",
+    "viewFile": "Vezi fișier",
+    "uploadError": "Eroare la încărcarea fișierului. Te rugăm să încerci din nou.",
+    "fileSizeError": "Dimensiunea fișierului trebuie să fie mai mică de 10MB",
     "products": {
       "mugs": "Căni",
       "tshirts": "Tricouri",
@@ -516,7 +586,19 @@
       "adding": "Se adaugă...",
       "errorName": "Numele este obligatoriu",
       "errorEmail": "Te rugăm să introduci o adresă de email validă",
-      "errorFailed": "Eroare la adăugarea clientului. Te rugăm să încerci din nou."
+      "errorFailed": "Eroare la adăugarea clientului. Te rugăm să încerci din nou.",
+      "inviteClient": "Invită client?",
+      "viaEmail": "prin Email"
+    },
+    "viewModal": {
+      "title": "Detalii client",
+      "name": "Nume",
+      "email": "Email",
+      "phone": "Telefon",
+      "company": "Companie",
+      "address": "Adresă",
+      "notes": "Notițe",
+      "edit": "Editează"
     },
     "editModal": {
       "title": "Editează client",

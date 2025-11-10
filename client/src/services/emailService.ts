@@ -9,11 +9,10 @@ export async function sendTeamInvitationEmail(data) {
   } catch (error) {
     console.error('Error sending invitation email:', error);
 
-    // In development, if email service is not configured, log the invitation link
+    // In development, if email service is not configured, return the invitation link
     if (error?.code === 'failed-precondition' ||
         error?.message?.includes('Email service is not configured')) {
       console.warn('Email service not configured. Invitation created but email not sent.');
-      console.log('Invitation link:', data.invitationLink);
       return data.invitationLink;
     }
 
@@ -30,11 +29,10 @@ export async function sendClientInvitationEmail(data) {
   } catch (error) {
     console.error('Error sending client invitation email:', error);
 
-    // In development, if email service is not configured, log the invitation link
+    // In development, if email service is not configured, return the invitation link
     if (error?.code === 'failed-precondition' ||
         error?.message?.includes('Email service is not configured')) {
       console.warn('Email service not configured. Invitation created but email not sent.');
-      console.log('Invitation link:', data.invitationLink);
       return data.invitationLink;
     }
 
