@@ -6,13 +6,13 @@ import { getFunctions } from "firebase/functions";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDH9qOITrOjyXQz4zfZ_2yZAlPH1SfC1xU",
-  authDomain: "serigrafie-brasov-69fde.firebaseapp.com",
-  projectId: "serigrafie-brasov-69fde",
-  storageBucket: "serigrafie-brasov-69fde.firebasestorage.app",
-  messagingSenderId: "287605276835",
-  appId: "1:287605276835:web:77253f5e1f736ace5c7f16",
-  measurementId: "G-G63F5TH2K2K9"
+  apiKey: "AIzaSyBo3Jaw3VDogwmuZq8A2vbgnQ702C5xaT8",
+  authDomain: "serigrafie-brasov.firebaseapp.com",
+  projectId: "serigrafie-brasov",
+  storageBucket: "serigrafie-brasov.firebasestorage.app",
+  messagingSenderId: "552500656443",
+  appId: "1:552500656443:web:5fafe981199a2937451f1e",
+  measurementId: "G-04G7RN8KE8"
 };
 
 const app = initializeApp(firebaseConfig);
