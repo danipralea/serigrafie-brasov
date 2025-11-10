@@ -1,16 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
-import { collection, addDoc, Timestamp, query, where, getDocs } from 'firebase/firestore';
-import { ProductType, OrderStatus } from '../types';
-import { showSuccess, showError } from '../services/notificationService';
+import { collection, Timestamp, writeBatch, doc } from 'firebase/firestore';
+import { OrderStatus } from '../types';
+import { showSuccess } from '../services/notificationService';
 import AuthModal from '../components/AuthModal';
 import AppShell from '../components/AppShell';
 import Navigation from '../components/Navigation';
-import { PhotoIcon } from '@heroicons/react/24/solid';
-import { ChevronDownIcon } from '@heroicons/react/16/solid';
+import SubOrderItem, { SubOrderData } from '../components/SubOrderItem';
+import { PlusIcon } from '@heroicons/react/20/solid';
 
 export default function PlaceOrder() {
   const { currentUser, userProfile } = useAuth();
@@ -20,18 +20,24 @@ export default function PlaceOrder() {
   const [error, setError] = useState('');
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [pendingSubmit, setPendingSubmit] = useState(false);
-  const [formData, setFormData] = useState({
-    productType: ProductType.MUGS,
-    quantity: '',
-    length: '',
-    width: '',
-    cmp: '',
-    description: '',
-    designFile: '',
-    deliveryTime: '',
-    contactPhone: '',
-    notes: ''
-  });
+  const [contactPhone, setContactPhone] = useState('');
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Sub-orders state
+  const [subOrders, setSubOrders] = useState<SubOrderData[]>([
+    {
+      id: crypto.randomUUID(),
+      productType: null,
+      quantity: '',
+      length: '',
+      width: '',
+      cmp: '',
+      description: '',
+      designFile: '',
+      deliveryTime: '',
+      notes: ''
+    }
+  ]);
 
   // Clear error when user authenticates and submit order if pending
   useEffect(() => {
@@ -43,26 +49,88 @@ export default function PlaceOrder() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, pendingSubmit]);
 
-  function handleChange(e) {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+  // Pre-fill contact phone with user's phone number if available
+  useEffect(() => {
+    if (currentUser?.phoneNumber && !contactPhone) {
+      setContactPhone(currentUser.phoneNumber);
+    }
+  }, [currentUser, contactPhone]);
+
+  // Scroll to top when error is set
+  useEffect(() => {
+    if (error && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [error]);
+
+  function handleSubOrderChange(id: string, field: string, value: any) {
+    setSubOrders(prev =>
+      prev.map(so => (so.id === id ? { ...so, [field]: value } : so))
+    );
   }
 
-  async function handleSubmit(e) {
+  function handleAddSubOrder() {
+    setSubOrders(prev => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        productType: null,
+        quantity: '',
+        length: '',
+        width: '',
+        cmp: '',
+        description: '',
+        designFile: '',
+        deliveryTime: '',
+        notes: ''
+      }
+    ]);
+  }
+
+  function handleRemoveSubOrder(id: string) {
+    setSubOrders(prev => prev.filter(so => so.id !== id));
+  }
+
+  function validateForm(): boolean {
+    // Validate at least one sub-order
+    if (subOrders.length === 0) {
+      setError(t('order.errorAtLeastOneSubOrder'));
+      return false;
+    }
+
+    // Validate each sub-order
+    for (let i = 0; i < subOrders.length; i++) {
+      const so = subOrders[i];
+
+      if (!so.productType) {
+        setError(`${t('order.subOrderItem')} #${i + 1}: ${t('order.errorProductTypeRequired')}`);
+        return false;
+      }
+
+      if (!so.quantity || parseInt(so.quantity) <= 0) {
+        setError(`${t('order.subOrderItem')} #${i + 1}: ${t('order.errorQuantityRequired')}`);
+        return false;
+      }
+
+      if (!so.deliveryTime || !so.deliveryTime.trim()) {
+        setError(`${t('order.subOrderItem')} #${i + 1}: ${t('order.errorDeliveryTimeRequired')}`);
+        return false;
+      }
+    }
+
+    setError('');
+    return true;
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!formData.quantity || !formData.description) {
-      setError(t('placeOrder.errorRequired'));
-      return;
-    }
+    if (!validateForm()) return;
 
     // Check if user is authenticated
     if (!currentUser) {
       setShowAuthModal(true);
-      setPendingSubmit(true); // Mark that we want to submit after auth
+      setPendingSubmit(true);
       return;
     }
 
@@ -71,8 +139,7 @@ export default function PlaceOrder() {
 
   function handleAuthSuccess() {
     setShowAuthModal(false);
-    setError(''); // Clear any previous errors
-    // The useEffect will handle submitting when currentUser updates
+    setError('');
   }
 
   async function submitOrder() {
@@ -82,61 +149,89 @@ export default function PlaceOrder() {
     }
 
     try {
-      setError('');
       setLoading(true);
+      setError('');
 
+      // Use batch write for atomic operations
+      const batch = writeBatch(db);
+      const timestamp = Timestamp.now();
+
+      // Create parent order reference
       const ordersRef = collection(db, 'orders');
-      const orderDoc = await addDoc(ordersRef, {
-        ...formData,
-        quantity: parseInt(formData.quantity),
-        length: formData.length ? parseFloat(formData.length) : null,
-        width: formData.width ? parseFloat(formData.width) : null,
-        cmp: formData.cmp ? parseFloat(formData.cmp) : null,
+      const orderRef = doc(ordersRef);
+
+      // Regular client - use their own info
+      const orderData = {
+        clientId: currentUser.uid,
+        clientName: currentUser.displayName || '',
+        clientEmail: currentUser.email || '',
+        clientPhone: contactPhone || '',
+        clientCompany: '',
         userId: currentUser.uid,
-        userEmail: currentUser.email,
         userName: currentUser.displayName || currentUser.email,
+        userEmail: currentUser.email,
         status: OrderStatus.PENDING_CONFIRMATION,
-        confirmedByClient: false,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now()
+        createdAt: timestamp,
+        updatedAt: timestamp
+      };
+
+      batch.set(orderRef, orderData);
+
+      // Create sub-orders in subcollection
+      subOrders.forEach((so) => {
+        const subOrderRef = doc(collection(db, 'orders', orderRef.id, 'subOrders'));
+        const subOrderData = {
+          productType: so.productType?.id || '',
+          productTypeName: so.productType?.name || '',
+          productTypeCustom: so.productType?.isCustom || false,
+          quantity: parseInt(so.quantity),
+          length: so.length ? parseFloat(so.length) : null,
+          width: so.width ? parseFloat(so.width) : null,
+          cmp: so.cmp ? parseFloat(so.cmp) : null,
+          description: so.description,
+          designFile: so.designFile || '',
+          designFilePath: so.designFilePath || '',
+          deliveryTime: so.deliveryTime || null,
+          notes: so.notes || '',
+          status: OrderStatus.PENDING,
+          createdAt: timestamp,
+          updatedAt: timestamp
+        };
+        batch.set(subOrderRef, subOrderData);
       });
 
-      // Create notification for client
-      const notificationsRef = collection(db, 'notifications');
-      await addDoc(notificationsRef, {
+      // Create initial order update
+      const updateRef = doc(collection(db, 'orderUpdates'));
+      batch.set(updateRef, {
+        orderId: orderRef.id,
         userId: currentUser.uid,
-        type: 'order_created',
-        title: 'Comandă nouă creată',
-        message: `Comanda #${orderDoc.id.substring(0, 8).toUpperCase()} a fost plasată cu succes`,
-        orderId: orderDoc.id,
-        read: false,
-        createdAt: Timestamp.now()
+        userName: currentUser.displayName || currentUser.email,
+        userEmail: currentUser.email,
+        text: t('dashboard.orderModal.orderCreatedByClient'),
+        isSystem: true,
+        createdAt: timestamp
       });
 
-      // Create notifications for all admins
-      const usersRef = collection(db, 'users');
-      const adminsQuery = query(usersRef, where('isAdmin', '==', true));
-      const adminsSnapshot = await getDocs(adminsQuery);
+      // Commit all writes atomically
+      await batch.commit();
 
-      const adminNotifications = adminsSnapshot.docs.map(adminDoc => {
-        return addDoc(notificationsRef, {
-          userId: adminDoc.id,
-          type: 'new_order',
-          title: 'Comandă nouă primită',
-          message: `${currentUser.displayName || currentUser.email} a plasat comanda #${orderDoc.id.substring(0, 8).toUpperCase()}`,
-          orderId: orderDoc.id,
-          read: false,
-          createdAt: Timestamp.now()
-        });
-      });
-
-      await Promise.all(adminNotifications);
-
-      showSuccess('Comandă creată cu succes!');
+      showSuccess(t('placeOrder.orderCreated'));
       navigate('/dashboard');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error creating order:', err);
-      setError('Failed to create order. Please try again.');
+
+      // Provide human-readable error messages
+      let errorMessage = t('placeOrder.orderFailed');
+
+      if (err?.code === 'permission-denied' || err?.message?.includes('permission')) {
+        errorMessage = t('placeOrder.errorPermissionDenied');
+      } else if (err?.code === 'unavailable' || err?.message?.includes('network')) {
+        errorMessage = t('placeOrder.errorNetworkIssue');
+      } else if (err?.message) {
+        errorMessage = `${t('placeOrder.orderFailed')}: ${err.message}`;
+      }
+
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -146,12 +241,10 @@ export default function PlaceOrder() {
   if (currentUser) {
     return (
       <AppShell title={t('placeOrder.title')}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {!userProfile?.isTeamMember && !userProfile?.isAdmin && (
-            <p className="mb-6 text-sm/6 text-slate-600 dark:text-slate-300 transition-colors">
-              {t('placeOrder.subtitle')}
-            </p>
-          )}
+        <div ref={scrollContainerRef} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <p className="mb-6 text-sm text-slate-600 dark:text-slate-300 transition-colors">
+            {t('placeOrder.subtitle')}
+          </p>
 
           {error && (
             <div className="mb-6 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 rounded-lg p-4 text-sm transition-colors">
@@ -160,240 +253,65 @@ export default function PlaceOrder() {
           )}
 
           <form onSubmit={handleSubmit}>
-              <div className="mt-10 space-y-8 border-b border-slate-200 dark:border-slate-700 pb-12 sm:space-y-0 sm:divide-y sm:divide-slate-200 dark:sm:divide-slate-700 sm:border-t sm:border-t-slate-200 dark:sm:border-t-slate-700 sm:pb-0 transition-colors">
-                {/* Product Type */}
-                <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                  <label htmlFor="productType" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                    {t('placeOrder.productType')} *
-                  </label>
-                  <div className="mt-2 sm:col-span-2 sm:mt-0">
-                    <div className="grid grid-cols-1 sm:max-w-md">
-                      <select
-                        id="productType"
-                        name="productType"
-                        value={formData.productType}
-                        onChange={handleChange}
-                        required
-                        className="col-start-1 row-start-1 w-full appearance-none rounded-md bg-white dark:bg-slate-700 py-1.5 pr-8 pl-3 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:text-sm/6 transition-colors"
-                      >
-                        <option value={ProductType.MUGS}>{t('placeOrder.products.mugs')}</option>
-                        <option value={ProductType.T_SHIRTS}>{t('placeOrder.products.tshirts')}</option>
-                        <option value={ProductType.HOODIES}>{t('placeOrder.products.hoodies')}</option>
-                        <option value={ProductType.BAGS}>{t('placeOrder.products.bags')}</option>
-                        <option value={ProductType.CAPS}>{t('placeOrder.products.caps')}</option>
-                        <option value={ProductType.OTHER}>{t('placeOrder.products.other')}</option>
-                      </select>
-                      <ChevronDownIcon
-                        aria-hidden="true"
-                        className="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-gray-500 dark:text-slate-400 sm:size-4 transition-colors"
-                      />
-                    </div>
-                  </div>
-                </div>
+            {/* Contact Phone */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
+                {t('order.contactPhone')}
+              </label>
+              <input
+                type="tel"
+                value={contactPhone}
+                onChange={(e) => setContactPhone(e.target.value)}
+                placeholder={t('placeOrder.phonePlaceholder')}
+                className="block w-full sm:max-w-md rounded-md bg-white dark:bg-slate-700 px-3 py-2 text-sm text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 transition-colors"
+              />
+            </div>
 
-                {/* Quantity */}
-                <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                  <label htmlFor="quantity" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                    {t('placeOrder.quantity')} *
-                  </label>
-                  <div className="mt-2 sm:col-span-2 sm:mt-0">
-                    <input
-                      type="number"
-                      id="quantity"
-                      name="quantity"
-                      min="1"
-                      value={formData.quantity}
-                      onChange={handleChange}
-                      required
-                      placeholder={t('placeOrder.quantityPlaceholder')}
-                      className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-xs sm:text-sm/6 transition-colors"
-                    />
-                  </div>
-                </div>
+            {/* Divider */}
+            <div className="border-t border-gray-200 dark:border-slate-700 my-6"></div>
 
-                {/* Length */}
-                <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                  <label htmlFor="length" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                    {t('placeOrder.length')}
-                  </label>
-                  <div className="mt-2 sm:col-span-2 sm:mt-0">
-                    <input
-                      type="number"
-                      id="length"
-                      name="length"
-                      min="0"
-                      step="0.01"
-                      value={formData.length}
-                      onChange={handleChange}
-                      placeholder={t('placeOrder.lengthPlaceholder')}
-                      className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-xs sm:text-sm/6 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                {/* Width */}
-                <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                  <label htmlFor="width" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                    {t('placeOrder.width')}
-                  </label>
-                  <div className="mt-2 sm:col-span-2 sm:mt-0">
-                    <input
-                      type="number"
-                      id="width"
-                      name="width"
-                      min="0"
-                      step="0.01"
-                      value={formData.width}
-                      onChange={handleChange}
-                      placeholder={t('placeOrder.widthPlaceholder')}
-                      className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-xs sm:text-sm/6 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                {/* CMP (Cost/Price per unit) */}
-                <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                  <label htmlFor="cmp" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                    {t('placeOrder.cmp')}
-                  </label>
-                  <div className="mt-2 sm:col-span-2 sm:mt-0">
-                    <input
-                      type="number"
-                      id="cmp"
-                      name="cmp"
-                      min="0"
-                      step="0.01"
-                      value={formData.cmp}
-                      onChange={handleChange}
-                      placeholder={t('placeOrder.cmpPlaceholder')}
-                      className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-xs sm:text-sm/6 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                {/* Description */}
-                <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                  <label htmlFor="description" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                    {t('placeOrder.description')} *
-                  </label>
-                  <div className="mt-2 sm:col-span-2 sm:mt-0">
-                    <textarea
-                      id="description"
-                      name="description"
-                      rows={4}
-                      value={formData.description}
-                      onChange={handleChange}
-                      required
-                      placeholder={t('placeOrder.descriptionPlaceholder')}
-                      className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-2xl sm:text-sm/6 transition-colors"
-                    />
-                    <p className="mt-3 text-sm/6 text-slate-600 dark:text-slate-300 transition-colors">{t('placeOrder.descriptionHelp')}</p>
-                  </div>
-                </div>
-
-                {/* Design File */}
-                <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                  <label htmlFor="designFile" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                    {t('placeOrder.designFile')}
-                  </label>
-                  <div className="mt-2 sm:col-span-2 sm:mt-0">
-                    <div className="flex max-w-2xl justify-center rounded-lg border border-dashed border-slate-300 dark:border-slate-600 px-6 py-10 transition-colors">
-                      <div className="text-center">
-                        <PhotoIcon aria-hidden="true" className="mx-auto size-12 text-slate-300 dark:text-slate-600 transition-colors" />
-                        <div className="mt-4 flex text-sm/6 text-slate-600 dark:text-slate-300 transition-colors">
-                          <label
-                            htmlFor="file-upload"
-                            className="relative cursor-pointer rounded-md bg-transparent font-semibold text-blue-600 dark:text-blue-400 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-blue-500 hover:text-blue-500 dark:hover:text-blue-300 transition-colors"
-                          >
-                            <span>{t('placeOrder.uploadFile')}</span>
-                            <input id="file-upload" name="file-upload" type="file" className="sr-only" />
-                          </label>
-                          <p className="pl-1">{t('placeOrder.dragDrop')}</p>
-                        </div>
-                        <p className="text-xs/5 text-slate-600 dark:text-slate-400 transition-colors">{t('placeOrder.fileTypes')}</p>
-                        <div className="mt-4">
-                          <input
-                            type="url"
-                            id="designFile"
-                            name="designFile"
-                            value={formData.designFile}
-                            onChange={handleChange}
-                            placeholder={t('placeOrder.designFileUrl')}
-                            className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-sm text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 transition-colors"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Delivery Time */}
-                <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                  <label htmlFor="deliveryTime" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                    {t('placeOrder.deliveryTime')}
-                  </label>
-                  <div className="mt-2 sm:col-span-2 sm:mt-0">
-                    <input
-                      type="datetime-local"
-                      id="deliveryTime"
-                      name="deliveryTime"
-                      value={formData.deliveryTime}
-                      onChange={handleChange}
-                      min={new Date().toISOString().slice(0, 16)}
-                      className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-md sm:text-sm/6 transition-colors [color-scheme:light] dark:[color-scheme:dark]"
-                    />
-                  </div>
-                </div>
-
-                {/* Contact Phone */}
-                <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                  <label htmlFor="contactPhone" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                    {t('placeOrder.contactPhone')}
-                  </label>
-                  <div className="mt-2 sm:col-span-2 sm:mt-0">
-                    <input
-                      type="tel"
-                      id="contactPhone"
-                      name="contactPhone"
-                      value={formData.contactPhone}
-                      onChange={handleChange}
-                      placeholder="+40 xxx xxx xxx"
-                      className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-md sm:text-sm/6 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                {/* Additional Notes */}
-                <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                  <label htmlFor="notes" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                    {t('placeOrder.notes')}
-                  </label>
-                  <div className="mt-2 sm:col-span-2 sm:mt-0">
-                    <textarea
-                      id="notes"
-                      name="notes"
-                      rows={3}
-                      value={formData.notes}
-                      onChange={handleChange}
-                      placeholder={t('placeOrder.notesPlaceholder')}
-                      className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-2xl sm:text-sm/6 transition-colors"
-                    />
-                  </div>
-                </div>
+            {/* Sub-Orders Section */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                  {t('order.orderItems')}
+                </h3>
+                <button
+                  type="button"
+                  onClick={handleAddSubOrder}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-md transition-colors"
+                >
+                  <PlusIcon className="w-4 h-4" />
+                  {t('order.addItem')}
+                </button>
               </div>
+
+              <div className="space-y-4">
+                {subOrders.map((subOrder, index) => (
+                  <SubOrderItem
+                    key={subOrder.id}
+                    subOrder={subOrder}
+                    index={index}
+                    onChange={handleSubOrderChange}
+                    onRemove={handleRemoveSubOrder}
+                    canRemove={subOrders.length > 1}
+                  />
+                ))}
+              </div>
+            </div>
 
             <div className="mt-6 flex items-center justify-end gap-x-6">
               <button
                 type="button"
                 onClick={() => navigate('/dashboard')}
-                className="text-sm/6 font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
+                className="text-sm font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
               >
                 {t('placeOrder.cancel')}
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="inline-flex justify-center rounded-md bg-gradient-to-r from-blue-600 to-cyan-500 px-3 py-2 text-sm font-semibold text-white shadow-xs hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                className="inline-flex justify-center rounded-md bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-2 text-sm font-semibold text-white shadow-xs hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
               >
                 {loading ? t('placeOrder.submitting') : t('placeOrder.submit')}
               </button>
@@ -404,251 +322,74 @@ export default function PlaceOrder() {
     );
   }
 
-  // For unauthenticated users, use the old Navigation component
+  // For unauthenticated users
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors">
       {/* Navigation Bar */}
       <Navigation variant="landing" />
 
       {/* Main Content */}
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
+      <main ref={scrollContainerRef} className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white transition-colors">
+            {t('placeOrder.title')}
+          </h2>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300 transition-colors">
+            {t('placeOrder.subtitle')}
+          </p>
+        </div>
+
+        {error && (
+          <div className="mb-6 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 rounded-lg p-4 text-sm transition-colors">
+            {error}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit}>
-            <div className="space-y-12 sm:space-y-16">
-              <div>
-                <h2 className="text-base/7 font-semibold text-slate-900 dark:text-white transition-colors">
-                  {t('placeOrder.title')}
-                </h2>
-                <p className="mt-1 max-w-2xl text-sm/6 text-slate-600 dark:text-slate-300 transition-colors">
-                  {t('placeOrder.subtitle')}
-                </p>
+          {/* Contact Phone */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
+              {t('order.contactPhone')}
+            </label>
+            <input
+              type="tel"
+              value={contactPhone}
+              onChange={(e) => setContactPhone(e.target.value)}
+              placeholder={t('placeOrder.phonePlaceholder')}
+              className="block w-full sm:max-w-md rounded-md bg-white dark:bg-slate-700 px-3 py-2 text-sm text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 transition-colors"
+            />
+          </div>
 
-                {error && (
-                  <div className="mt-6 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 rounded-lg p-4 text-sm transition-colors">
-                    {error}
-                  </div>
-                )}
+          {/* Divider */}
+          <div className="border-t border-gray-200 dark:border-slate-700 my-6"></div>
 
-              <div className="mt-10 space-y-8 border-b border-slate-200 dark:border-slate-700 pb-12 sm:space-y-0 sm:divide-y sm:divide-slate-200 dark:sm:divide-slate-700 sm:border-t sm:border-t-slate-200 dark:sm:border-t-slate-700 sm:pb-0 transition-colors">
-                {/* Product Type */}
-                <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                  <label htmlFor="productType" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                    {t('placeOrder.productType')} *
-                  </label>
-                  <div className="mt-2 sm:col-span-2 sm:mt-0">
-                    <div className="grid grid-cols-1 sm:max-w-md">
-                      <select
-                        id="productType"
-                        name="productType"
-                        value={formData.productType}
-                        onChange={handleChange}
-                        required
-                        className="col-start-1 row-start-1 w-full appearance-none rounded-md bg-white dark:bg-slate-700 py-1.5 pr-8 pl-3 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:text-sm/6 transition-colors"
-                      >
-                        <option value={ProductType.MUGS}>{t('placeOrder.products.mugs')}</option>
-                        <option value={ProductType.T_SHIRTS}>{t('placeOrder.products.tshirts')}</option>
-                        <option value={ProductType.HOODIES}>{t('placeOrder.products.hoodies')}</option>
-                        <option value={ProductType.BAGS}>{t('placeOrder.products.bags')}</option>
-                        <option value={ProductType.CAPS}>{t('placeOrder.products.caps')}</option>
-                        <option value={ProductType.OTHER}>{t('placeOrder.products.other')}</option>
-                      </select>
-                      <ChevronDownIcon
-                        aria-hidden="true"
-                        className="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-gray-500 dark:text-slate-400 sm:size-4 transition-colors"
-                      />
-                    </div>
-                  </div>
-                </div>
+          {/* Sub-Orders Section */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                {t('order.orderItems')}
+              </h3>
+              <button
+                type="button"
+                onClick={handleAddSubOrder}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-md transition-colors"
+              >
+                <PlusIcon className="w-4 h-4" />
+                {t('order.addItem')}
+              </button>
+            </div>
 
-                {/* Quantity */}
-                <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                  <label htmlFor="quantity" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                    {t('placeOrder.quantity')} *
-                  </label>
-                  <div className="mt-2 sm:col-span-2 sm:mt-0">
-                    <input
-                      type="number"
-                      id="quantity"
-                      name="quantity"
-                      min="1"
-                      value={formData.quantity}
-                      onChange={handleChange}
-                      required
-                      placeholder={t('placeOrder.quantityPlaceholder')}
-                      className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-xs sm:text-sm/6 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                {/* Length */}
-                <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                  <label htmlFor="length" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                    {t('placeOrder.length')}
-                  </label>
-                  <div className="mt-2 sm:col-span-2 sm:mt-0">
-                    <input
-                      type="number"
-                      id="length"
-                      name="length"
-                      min="0"
-                      step="0.01"
-                      value={formData.length}
-                      onChange={handleChange}
-                      placeholder={t('placeOrder.lengthPlaceholder')}
-                      className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-xs sm:text-sm/6 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                {/* Width */}
-                <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                  <label htmlFor="width" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                    {t('placeOrder.width')}
-                  </label>
-                  <div className="mt-2 sm:col-span-2 sm:mt-0">
-                    <input
-                      type="number"
-                      id="width"
-                      name="width"
-                      min="0"
-                      step="0.01"
-                      value={formData.width}
-                      onChange={handleChange}
-                      placeholder={t('placeOrder.widthPlaceholder')}
-                      className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-xs sm:text-sm/6 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                {/* CMP (Cost/Price per unit) */}
-                <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                  <label htmlFor="cmp" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                    {t('placeOrder.cmp')}
-                  </label>
-                  <div className="mt-2 sm:col-span-2 sm:mt-0">
-                    <input
-                      type="number"
-                      id="cmp"
-                      name="cmp"
-                      min="0"
-                      step="0.01"
-                      value={formData.cmp}
-                      onChange={handleChange}
-                      placeholder={t('placeOrder.cmpPlaceholder')}
-                      className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-xs sm:text-sm/6 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                {/* Description */}
-                <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                  <label htmlFor="description" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                    {t('placeOrder.description')} *
-                  </label>
-                  <div className="mt-2 sm:col-span-2 sm:mt-0">
-                    <textarea
-                      id="description"
-                      name="description"
-                      rows={4}
-                      value={formData.description}
-                      onChange={handleChange}
-                      required
-                      placeholder={t('placeOrder.descriptionPlaceholder')}
-                      className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-2xl sm:text-sm/6 transition-colors"
-                    />
-                    <p className="mt-3 text-sm/6 text-slate-600 dark:text-slate-300 transition-colors">{t('placeOrder.descriptionHelp')}</p>
-                  </div>
-                </div>
-
-                {/* Design File */}
-                <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                  <label htmlFor="designFile" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                    {t('placeOrder.designFile')}
-                  </label>
-                  <div className="mt-2 sm:col-span-2 sm:mt-0">
-                    <div className="flex max-w-2xl justify-center rounded-lg border border-dashed border-slate-300 dark:border-slate-600 px-6 py-10 transition-colors">
-                      <div className="text-center">
-                        <PhotoIcon aria-hidden="true" className="mx-auto size-12 text-slate-300 dark:text-slate-600 transition-colors" />
-                        <div className="mt-4 flex text-sm/6 text-slate-600 dark:text-slate-300 transition-colors">
-                          <label
-                            htmlFor="file-upload"
-                            className="relative cursor-pointer rounded-md bg-transparent font-semibold text-blue-600 dark:text-blue-400 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-blue-500 hover:text-blue-500 dark:hover:text-blue-300 transition-colors"
-                          >
-                            <span>{t('placeOrder.uploadFile')}</span>
-                            <input id="file-upload" name="file-upload" type="file" className="sr-only" />
-                          </label>
-                          <p className="pl-1">{t('placeOrder.dragDrop')}</p>
-                        </div>
-                        <p className="text-xs/5 text-slate-600 dark:text-slate-400 transition-colors">{t('placeOrder.fileTypes')}</p>
-                        <div className="mt-4">
-                          <input
-                            type="url"
-                            id="designFile"
-                            name="designFile"
-                            value={formData.designFile}
-                            onChange={handleChange}
-                            placeholder={t('placeOrder.designFileUrl')}
-                            className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-sm text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 transition-colors"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Delivery Time */}
-                <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                  <label htmlFor="deliveryTime" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                    {t('placeOrder.deliveryTime')}
-                  </label>
-                  <div className="mt-2 sm:col-span-2 sm:mt-0">
-                    <input
-                      type="datetime-local"
-                      id="deliveryTime"
-                      name="deliveryTime"
-                      value={formData.deliveryTime}
-                      onChange={handleChange}
-                      min={new Date().toISOString().slice(0, 16)}
-                      className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-md sm:text-sm/6 transition-colors [color-scheme:light] dark:[color-scheme:dark]"
-                    />
-                  </div>
-                </div>
-
-                {/* Contact Phone */}
-                <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                  <label htmlFor="contactPhone" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                    {t('placeOrder.contactPhone')}
-                  </label>
-                  <div className="mt-2 sm:col-span-2 sm:mt-0">
-                    <input
-                      type="tel"
-                      id="contactPhone"
-                      name="contactPhone"
-                      value={formData.contactPhone}
-                      onChange={handleChange}
-                      placeholder="+40 xxx xxx xxx"
-                      className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-md sm:text-sm/6 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                {/* Additional Notes */}
-                <div className="sm:grid sm:grid-cols-3 sm:items-start sm:gap-4 sm:py-6">
-                  <label htmlFor="notes" className="block text-sm/6 font-medium text-slate-900 dark:text-slate-100 sm:pt-1.5 transition-colors">
-                    {t('placeOrder.notes')}
-                  </label>
-                  <div className="mt-2 sm:col-span-2 sm:mt-0">
-                    <textarea
-                      id="notes"
-                      name="notes"
-                      rows={3}
-                      value={formData.notes}
-                      onChange={handleChange}
-                      placeholder={t('placeOrder.notesPlaceholder')}
-                      className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-1.5 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 sm:max-w-2xl sm:text-sm/6 transition-colors"
-                    />
-                  </div>
-                </div>
-              </div>
+            <div className="space-y-4">
+              {subOrders.map((subOrder, index) => (
+                <SubOrderItem
+                  key={subOrder.id}
+                  subOrder={subOrder}
+                  index={index}
+                  onChange={handleSubOrderChange}
+                  onRemove={handleRemoveSubOrder}
+                  canRemove={subOrders.length > 1}
+                />
+              ))}
             </div>
           </div>
 
@@ -656,14 +397,14 @@ export default function PlaceOrder() {
             <button
               type="button"
               onClick={() => navigate('/')}
-              className="text-sm/6 font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
+              className="text-sm font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
             >
               {t('placeOrder.cancel')}
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="inline-flex justify-center rounded-md bg-gradient-to-r from-blue-600 to-cyan-500 px-3 py-2 text-sm font-semibold text-white shadow-xs hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+              className="inline-flex justify-center rounded-md bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-2 text-sm font-semibold text-white shadow-xs hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
             >
               {loading ? t('placeOrder.submitting') : t('placeOrder.submit')}
             </button>
@@ -677,7 +418,6 @@ export default function PlaceOrder() {
         onClose={() => setShowAuthModal(false)}
         onSuccess={handleAuthSuccess}
       />
-
     </div>
   );
 }
