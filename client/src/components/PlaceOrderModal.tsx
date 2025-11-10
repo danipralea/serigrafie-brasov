@@ -171,8 +171,18 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
       };
     } else {
       // Regular client - use their own info
-      // Use current Firebase Auth displayName (AuthContext syncs this to Firestore)
-      const clientName = currentUser.displayName || currentUser.email || '';
+      // Prioritize Firestore userProfile.displayName over Firebase Auth
+      const clientName = userProfile?.displayName || currentUser.displayName || currentUser.email || currentUser.phoneNumber || '';
+
+      // Debug logging
+      console.log('=== PLACE ORDER MODAL DEBUG ===');
+      console.log('userProfile.displayName:', userProfile?.displayName);
+      console.log('currentUser.displayName:', currentUser.displayName);
+      console.log('currentUser.email:', currentUser.email);
+      console.log('currentUser.phoneNumber:', currentUser.phoneNumber);
+      console.log('userProfile:', userProfile);
+      console.log('clientName being used:', clientName);
+      console.log('==============================');
 
       clientData = {
         clientId: currentUser.uid,
@@ -196,8 +206,8 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
       const orderRef = doc(ordersRef);
 
       const isAdminOrTeam = userProfile?.isAdmin || userProfile?.isTeamMember;
-      // Use current Firebase Auth displayName (AuthContext syncs this to Firestore)
-      const userName = currentUser.displayName || currentUser.email || '';
+      // Prioritize Firestore userProfile.displayName over Firebase Auth
+      const userName = userProfile?.displayName || currentUser.displayName || currentUser.email || currentUser.phoneNumber || '';
 
       const orderData = {
         ...(isAdminOrTeam && orderName.trim() ? { orderName: orderName.trim() } : {}),
@@ -218,6 +228,7 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
       subOrders.forEach((so) => {
         const subOrderRef = doc(collection(db, 'orders', orderRef.id, 'subOrders'));
         const subOrderData = {
+          userId: currentUser.uid,  // Store userId for security rules
           productType: so.productType?.id || '',
           productTypeName: so.productType?.name || '',
           productTypeCustom: so.productType?.isCustom || false,

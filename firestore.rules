@@ -76,25 +76,25 @@ service cloud.firestore {
 
       // Sub-orders sub-collection
       match /subOrders/{subOrderId} {
-        // Same read permissions as parent order
+        // Users can read their own sub-orders (userId stored on each sub-order)
         allow read: if isAuthenticated() && (
-          get(/databases/$(database)/documents/orders/$(orderId)).data.userId == request.auth.uid ||
+          resource.data.userId == request.auth.uid ||
           isAdminOrTeamMember()
         );
 
-        // Allow authenticated users to create sub-orders (parent order creation validates userId)
-        // This is needed for batch writes where parent order doesn't exist yet
-        allow create: if isAuthenticated();
+        // Allow authenticated users to create sub-orders with their own userId
+        allow create: if isAuthenticated() &&
+                         request.resource.data.userId == request.auth.uid;
 
         // Order owner or admins/team members can update sub-orders
         allow update: if isAuthenticated() && (
-          get(/databases/$(database)/documents/orders/$(orderId)).data.userId == request.auth.uid ||
+          resource.data.userId == request.auth.uid ||
           isAdminOrTeamMember()
         );
 
         // Order owner or admins/team members can delete sub-orders
         allow delete: if isAuthenticated() && (
-          get(/databases/$(database)/documents/orders/$(orderId)).data.userId == request.auth.uid ||
+          resource.data.userId == request.auth.uid ||
           isAdminOrTeamMember()
         );
       }

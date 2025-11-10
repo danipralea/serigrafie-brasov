@@ -161,8 +161,18 @@ export default function PlaceOrder() {
       const orderRef = doc(ordersRef);
 
       // Regular client - use their own info
-      // Use current Firebase Auth displayName (AuthContext syncs this to Firestore)
-      const clientName = currentUser.displayName || currentUser.email || '';
+      // Prioritize Firestore userProfile.displayName over Firebase Auth
+      const clientName = userProfile?.displayName || currentUser.displayName || currentUser.email || currentUser.phoneNumber || '';
+
+      // Debug logging
+      console.log('=== ORDER CREATION DEBUG ===');
+      console.log('userProfile.displayName:', userProfile?.displayName);
+      console.log('currentUser.displayName:', currentUser.displayName);
+      console.log('currentUser.email:', currentUser.email);
+      console.log('currentUser.phoneNumber:', currentUser.phoneNumber);
+      console.log('userProfile:', userProfile);
+      console.log('clientName being used:', clientName);
+      console.log('==========================');
 
       const orderData = {
         clientId: currentUser.uid,
@@ -184,6 +194,7 @@ export default function PlaceOrder() {
       subOrders.forEach((so) => {
         const subOrderRef = doc(collection(db, 'orders', orderRef.id, 'subOrders'));
         const subOrderData = {
+          userId: currentUser.uid,  // Store userId for security rules
           productType: so.productType?.id || '',
           productTypeName: so.productType?.name || '',
           productTypeCustom: so.productType?.isCustom || false,
