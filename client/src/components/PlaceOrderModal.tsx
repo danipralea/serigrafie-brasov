@@ -174,16 +174,6 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
       // Prioritize Firestore userProfile.displayName over Firebase Auth
       const clientName = userProfile?.displayName || currentUser.displayName || currentUser.email || currentUser.phoneNumber || '';
 
-      // Debug logging
-      console.log('=== PLACE ORDER MODAL DEBUG ===');
-      console.log('userProfile.displayName:', userProfile?.displayName);
-      console.log('currentUser.displayName:', currentUser.displayName);
-      console.log('currentUser.email:', currentUser.email);
-      console.log('currentUser.phoneNumber:', currentUser.phoneNumber);
-      console.log('userProfile:', userProfile);
-      console.log('clientName being used:', clientName);
-      console.log('==============================');
-
       clientData = {
         clientId: currentUser.uid,
         clientName: clientName,
