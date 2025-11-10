@@ -62,10 +62,16 @@ npm run test:debug
 
 1. **Tests check** if Firebase emulators are running (must be started manually)
 2. **Vite dev server starts** at `localhost:5173`
-3. **Test data is seeded** (users, orders, product types)
-4. **Tests run** against the local environment
+3. **Test data is seeded** (users, orders, product types) - allowed by test-specific security rules
+4. **Tests run** against the local environment - authentication is enforced
 5. **Data is cleaned** between each test
 6. **Emulators keep running** (stop with Ctrl+C in emulator terminal)
+
+**Note on Security Rules**:
+- When you run `npm run emulators`, the script automatically swaps `firestore.rules` with `firestore.test.rules`
+- Test rules allow unauthenticated creation during test data seeding
+- When you stop emulators (Ctrl+C), production rules are automatically restored
+- The backup file (`firestore.rules.backup`) is ignored by git
 
 ## Test Users
 

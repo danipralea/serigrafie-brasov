@@ -66,13 +66,21 @@ e2e-tests/
 
 ## How It Works
 
-1. **Global Setup**: Starts Firebase emulators before any tests run
+1. **Test Rules**: When you run `npm run emulators`, the start script automatically:
+   - Backs up `firestore.rules` → `firestore.rules.backup`
+   - Copies `firestore.test.rules` → `firestore.rules`
+   - Starts emulators with test rules
+   - Restores production rules when you press Ctrl+C
+
+   Test rules allow unauthenticated creation of test data during seeding, while still enforcing authentication during test execution.
+
 2. **Test Fixtures**: Each test automatically:
    - Clears emulator data
-   - Seeds test data (users, orders, etc.)
-   - Runs the test
+   - Seeds test data (users, orders, etc.) - allowed by test rules
+   - Runs the test - authentication is enforced
    - Cleans up after itself
-3. **Global Teardown**: Stops emulators after all tests complete
+
+3. **Emulator Control**: Emulators must be started manually before running tests (see "Manual Emulator Control" section)
 
 ## Test Data
 

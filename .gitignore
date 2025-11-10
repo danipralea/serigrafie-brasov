@@ -48,6 +48,7 @@ firebase-debug.log
 firestore-debug.log
 ui-debug.log
 functions/.runtimeconfig.json
+firestore.rules.backup
 
 # Claude
 .claude
