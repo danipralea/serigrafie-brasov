@@ -53,14 +53,28 @@ export default function ProductTypeAutocomplete({
     fetchCustomProductTypes();
   }, []);
 
+  // Helper function to remove Romanian diacritics for search
+  function removeDiacritics(str: string): string {
+    return str
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove combining diacritical marks
+      .replace(/ă/g, 'a')
+      .replace(/â/g, 'a')
+      .replace(/î/g, 'i')
+      .replace(/ș/g, 's')
+      .replace(/ț/g, 't');
+  }
+
   // Memoize filtered product types to avoid React warning about changing dependency array size
   const filteredProductTypes = useMemo(() => {
     if (searchQuery && searchQuery !== selectedProductType?.name) {
-      const query = searchQuery.toLowerCase();
-      return productTypes.filter(pt =>
-        pt.name?.toLowerCase().includes(query) ||
-        pt.description?.toLowerCase().includes(query)
-      );
+      const normalizedQuery = removeDiacritics(searchQuery);
+      return productTypes.filter(pt => {
+        const normalizedName = removeDiacritics(pt.name || '');
+        const normalizedDesc = removeDiacritics(pt.description || '');
+        return normalizedName.includes(normalizedQuery) || normalizedDesc.includes(normalizedQuery);
+      });
     }
     return productTypes;
   }, [searchQuery, productTypes, selectedProductType]);

@@ -32,15 +32,18 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Parent order data
+  const [orderName, setOrderName] = useState('');
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [contactPhone, setContactPhone] = useState('');
   const [clientError, setClientError] = useState('');
+  const [orderNameError, setOrderNameError] = useState('');
 
   // Clear errors when modal opens
   useEffect(() => {
     if (open) {
       setError('');
       setClientError('');
+      setOrderNameError('');
     }
   }, [open]);
 
@@ -96,6 +99,13 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
   }
 
   function validateForm(): boolean {
+    // Validate order name
+    if (!orderName || !orderName.trim()) {
+      setOrderNameError(t('order.errorOrderNameRequired'));
+      return false;
+    }
+    setOrderNameError('');
+
     // Validate client (only for admin/team members)
     const isAdminOrTeam = userProfile?.isAdmin || userProfile?.isTeamMember;
     if (isAdminOrTeam && !selectedClient) {
@@ -177,6 +187,7 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
       const orderRef = doc(ordersRef);
 
       const orderData = {
+        orderName: orderName.trim(),
         ...clientData,
         userId: currentUser.uid,
         userName: currentUser.displayName || currentUser.email,
@@ -231,6 +242,7 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
       await batch.commit();
 
       // Reset form
+      setOrderName('');
       setSelectedClient(null);
       setContactPhone('');
       setSubOrders([
@@ -309,6 +321,27 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
                 <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
               </div>
             )}
+
+            {/* Order Name */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
+                {t('order.orderName')} *
+              </label>
+              <input
+                type="text"
+                value={orderName}
+                onChange={(e) => setOrderName(e.target.value)}
+                placeholder={t('order.orderNamePlaceholder')}
+                className={`block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-2 text-sm text-gray-900 dark:text-white outline-1 -outline-offset-1 ${
+                  orderNameError
+                    ? 'outline-red-500 dark:outline-red-500'
+                    : 'outline-gray-300 dark:outline-slate-600'
+                } placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 transition-colors`}
+              />
+              {orderNameError && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{orderNameError}</p>
+              )}
+            </div>
 
             {/* Client Section - Only for Admin/Team Members */}
             {(userProfile?.isAdmin || userProfile?.isTeamMember) && (

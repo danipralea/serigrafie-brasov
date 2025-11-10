@@ -24,6 +24,8 @@
   },
   "order": {
     "createNewOrder": "Create New Order",
+    "orderName": "Order Name",
+    "orderNamePlaceholder": "e.g. Custom mugs for corporate event",
     "clientInformation": "Client Information",
     "client": "Client",
     "clientPlaceholder": "Search for a client...",
@@ -37,6 +39,7 @@
     "createOrder": "Create Order",
     "productTypePlaceholder": "Search for a product type...",
     "addNewProductType": "Add New Product Type",
+    "errorOrderNameRequired": "Order name is required",
     "errorClientRequired": "Please select a client",
     "errorAtLeastOneSubOrder": "Please add at least one order item",
     "errorProductTypeRequired": "Product type is required",

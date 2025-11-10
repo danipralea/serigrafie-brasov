@@ -398,6 +398,16 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
 
           {/* Modal Body */}
           <div className="px-6 py-4">
+            {/* Order Name */}
+            {selectedOrder.orderName && (
+              <div className="mb-6">
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{t('order.orderName')}</h4>
+                <div className="bg-gray-50 dark:bg-slate-700 rounded-lg p-4">
+                  <p className="text-base font-medium text-gray-900 dark:text-white">{selectedOrder.orderName}</p>
+                </div>
+              </div>
+            )}
+
             {/* Client Information */}
             {selectedOrder.clientName && (
               <div className="mb-6">

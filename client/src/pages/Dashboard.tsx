@@ -213,6 +213,7 @@ export default function Dashboard() {
         // Search in parent order fields
         const orderMatches =
           order.id.toLowerCase().includes(query) ||
+          order.orderName?.toLowerCase().includes(query) ||
           order.clientName?.toLowerCase().includes(query) ||
           order.clientEmail?.toLowerCase().includes(query) ||
           order.clientPhone?.toLowerCase().includes(query) ||
@@ -857,6 +858,9 @@ export default function Dashboard() {
                       {t('dashboard.table.client')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      {t('order.orderName')}
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                       {t('dashboard.table.items')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
@@ -892,6 +896,9 @@ export default function Dashboard() {
                           {order.clientCompany && (
                             <div className="text-xs text-slate-500 dark:text-slate-400">{order.clientCompany}</div>
                           )}
+                        </td>
+                        <td className="px-6 py-4 text-sm">
+                          <div className="text-slate-900 dark:text-white">{order.orderName || '-'}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
                           <div>{totalItems} {totalItems === 1 ? t('dashboard.table.item') : t('dashboard.table.items')}</div>

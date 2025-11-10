@@ -244,6 +244,8 @@
   },
   "order": {
     "createNewOrder": "Creează comandă nouă",
+    "orderName": "Denumire comandă",
+    "orderNamePlaceholder": "ex. Căni personalizate pentru eveniment corporativ",
     "clientInformation": "Informații client",
     "client": "Client",
     "clientPlaceholder": "Caută un client...",
@@ -257,6 +259,7 @@
     "createOrder": "Creează comandă",
     "productTypePlaceholder": "Caută un tip de produs...",
     "addNewProductType": "Adaugă tip de produs nou",
+    "errorOrderNameRequired": "Denumirea comenzii este obligatorie",
     "errorClientRequired": "Te rugăm să selectezi un client",
     "errorAtLeastOneSubOrder": "Te rugăm să adaugi cel puțin un articol",
     "errorProductTypeRequired": "Tipul de produs este obligatoriu",
