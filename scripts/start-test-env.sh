@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Start Firebase Emulators with Test Security Rules
+# Start Firebase Emulators for E2E Testing
 # This script should be run in a dedicated terminal
 
 set -e
@@ -18,49 +18,23 @@ fi
 # Check if Java is installed (required for Firestore emulator)
 if ! command -v java &> /dev/null; then
     echo "❌ Java is not installed (required for Firestore emulator)"
-    echo "macOS: brew install openjdk@11"
+    echo "macOS: brew install openjdk@21"
     exit 1
 fi
 
 echo "✅ Prerequisites check passed"
 echo ""
 
-# Backup production rules and use test rules
-echo "📋 Configuring test security rules..."
-if [ -f "firestore.rules.backup" ]; then
-    echo "   ⚠️  Backup already exists"
-else
-    cp firestore.rules firestore.rules.backup
-    echo "   ✅ Backed up production rules"
-fi
-
-cp firestore.test.rules firestore.rules
-echo "   ✅ Using test rules (firestore.test.rules)"
-echo ""
-
-# Function to restore rules on exit
-cleanup() {
-    echo ""
-    echo "🔄 Restoring production rules..."
-    if [ -f "firestore.rules.backup" ]; then
-        mv firestore.rules.backup firestore.rules
-        echo "   ✅ Restored production rules"
-    fi
-    exit 0
-}
-
-# Set trap to restore rules on exit
-trap cleanup EXIT INT TERM
-
 # Start Firebase emulators
-echo "🔥 Starting Firebase Emulators with TEST RULES..."
+echo "🔥 Starting Firebase Emulators with PRODUCTION RULES..."
 echo "   - Firestore: http://localhost:8080"
 echo "   - Auth: http://localhost:9099"
 echo "   - Storage: http://localhost:9199"
+echo "   - Functions: http://localhost:5001"
 echo "   - Emulator UI: http://localhost:4000"
 echo ""
+echo "ℹ️  Tests use production security rules with authenticated seeding"
 echo "⚠️  Keep this terminal open while running tests"
-echo "⚠️  Production rules will be restored when you press Ctrl+C"
 echo ""
 
 firebase emulators:start

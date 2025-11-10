@@ -73,7 +73,7 @@ export async function createTestUser(userData: TestUser) {
   const { auth, db } = initializeTestFirebase();
 
   try {
-    // Create user in Auth
+    // Create user in Auth (this always works, no rules check)
     const userCredential = await createUserWithEmailAndPassword(
       auth,
       userData.email,
@@ -82,7 +82,8 @@ export async function createTestUser(userData: TestUser) {
 
     const userId = userCredential.user.uid;
 
-    // Create user profile in Firestore (now allowed by test rules)
+    // Now authenticated as this user, create their profile
+    // This respects production rules (users can create their own profile)
     await setDoc(doc(db, 'users', userId), {
       email: userData.email,
       displayName: userData.displayName,
@@ -108,16 +109,19 @@ export async function createTestUser(userData: TestUser) {
 }
 
 export async function seedTestData() {
-  const { db } = initializeTestFirebase();
+  const { auth, db } = initializeTestFirebase();
 
-  // Create test users
+  // Create test users (this works because Firebase Auth allows signup)
   const admin = await createTestUser(TEST_USERS.admin);
   const teamMember = await createTestUser(TEST_USERS.teamMember);
   const client = await createTestUser(TEST_USERS.client);
 
   const now = Timestamp.now();
 
-  // Create product types (now allowed by test rules)
+  // Sign in as admin to create data (respects production rules!)
+  await signInWithEmailAndPassword(auth, admin.email, admin.password);
+
+  // Create product types (authenticated as admin)
   const productTypes = [
     { id: 'mugs', name: 'Mugs', userId: admin.uid },
     { id: 'tshirts', name: 'T-Shirts', userId: admin.uid },
@@ -134,7 +138,10 @@ export async function seedTestData() {
     });
   }
 
-  // Create a test order
+  // Sign in as client to create their order
+  await signInWithEmailAndPassword(auth, client.email, client.password);
+
+  // Create a test order (authenticated as client)
   const orderId = 'test-order-1';
   await setDoc(doc(db, 'orders', orderId), {
     orderName: 'Test Order',
@@ -151,7 +158,7 @@ export async function seedTestData() {
     updatedAt: now
   });
 
-  // Create sub-order
+  // Create sub-order (still authenticated as client)
   await setDoc(doc(db, 'orders', orderId, 'subOrders', 'sub-1'), {
     userId: client.uid,
     productType: 'mugs',
@@ -170,6 +177,9 @@ export async function seedTestData() {
     createdAt: now,
     updatedAt: now
   });
+
+  // Sign out after seeding
+  await auth.signOut();
 
   return { admin, teamMember, client };
 }
