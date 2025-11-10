@@ -12,6 +12,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import AppShell from '../components/AppShell';
 import { downloadInvoice, sendInvoiceToClient } from '../services/invoiceService';
 import { uploadFile } from '../services/storageService';
+import { showSuccess, showError } from '../services/notificationService';
 
 export default function Dashboard() {
   const { currentUser, userProfile } = useAuth();
@@ -484,9 +485,11 @@ export default function Dashboard() {
     if (!selectedOrder) return;
 
     try {
-      // Delete the order
-      const orderRef = doc(db, 'orders', selectedOrder.id);
-      await deleteDoc(orderRef);
+      // Delete sub-orders first
+      const subOrdersRef = collection(db, 'orders', selectedOrder.id, 'subOrders');
+      const subOrdersSnapshot = await getDocs(subOrdersRef);
+      const deleteSubOrderPromises = subOrdersSnapshot.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deleteSubOrderPromises);
 
       // Delete all updates related to this order
       const updatesRef = collection(db, 'orderUpdates');
@@ -502,11 +505,29 @@ export default function Dashboard() {
       const deleteNotifPromises = notificationsSnapshot.docs.map(doc => deleteDoc(doc.ref));
       await Promise.all(deleteNotifPromises);
 
-      // Close modal - orders will update automatically via listener
+      // Delete the order document itself
+      const orderRef = doc(db, 'orders', selectedOrder.id);
+      await deleteDoc(orderRef);
+
+      // Close modal and dialog - orders will update automatically via listener
       setShowOrderModal(false);
-    } catch (error) {
+      setShowDeleteDialog(false);
+
+      // Show success notification
+      showSuccess(t('dashboard.orderModal.orderDeleted'));
+    } catch (error: any) {
       console.error('Error deleting order:', error);
-      alert('Eroare la ștergerea comenzii');
+
+      // Show user-friendly error message
+      let errorMessage = t('dashboard.orderModal.deleteError');
+      if (error?.code === 'permission-denied') {
+        errorMessage = t('dashboard.orderModal.deletePermissionError');
+      }
+
+      showError(errorMessage);
+
+      // Re-throw error so ConfirmDialog knows it failed
+      throw error;
     }
   }
 

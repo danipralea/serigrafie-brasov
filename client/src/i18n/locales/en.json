@@ -50,6 +50,7 @@
     "descriptionPlaceholder": "Optional description",
     "add": "Add Product Type",
     "adding": "Adding...",
+    "createCustom": "Create custom",
     "errorName": "Product name is required",
     "errorFailed": "Failed to add product type"
   },
@@ -256,6 +257,9 @@
       "confirmationDesc": "Please review the order details and confirm to proceed with production.",
       "confirmOrder": "Confirm Order",
       "deleteOrder": "Delete Order",
+      "orderDeleted": "Order deleted successfully",
+      "deleteError": "Failed to delete order. Please try again.",
+      "deletePermissionError": "You don't have permission to delete this order.",
       "system": "System",
       "statusChangedTo": "Order status changed to:",
       "orderConfirmedByClient": "Order confirmed by client. Ready for processing.",
@@ -327,6 +331,8 @@
     "fillAllFields": "Please fill in all required fields",
     "orderCreated": "Order created successfully!",
     "orderFailed": "Failed to create order. Please try again.",
+    "errorPermissionDenied": "You don't have permission to create orders. Please contact your administrator.",
+    "errorNetworkIssue": "Network connection issue. Please check your internet connection and try again.",
     "products": {
       "mugs": "Mugs",
       "tshirts": "T-Shirts",

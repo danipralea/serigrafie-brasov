@@ -81,6 +81,12 @@ export default function AppShell({ children, title }: { children: React.ReactNod
         if (change.type === 'added') {
           const order = change.doc.data();
           const orderAge = Date.now() - order.createdAt?.toMillis();
+
+          // Don't show notification if current user created the order
+          if (order.userId === currentUser.uid) {
+            return;
+          }
+
           // Only show notification for orders created in the last 10 seconds (to avoid showing old ones on page load)
           if (orderAge < 10000) {
             const message = `${order.userName || order.userEmail} a plasat comanda #${change.doc.id.substring(0, 8).toUpperCase()}`;

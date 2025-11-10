@@ -90,7 +90,7 @@ export default function ClientAutocomplete({ selectedClient, onSelectClient, err
 
   function handleSelectClient(client: Client) {
     onSelectClient(client);
-    setSearchQuery(client.name);
+    setSearchQuery('');
     setShowDropdown(false);
   }
 
@@ -139,9 +139,9 @@ export default function ClientAutocomplete({ selectedClient, onSelectClient, err
       // Add to local state
       setClients([...clients, addedClient]);
 
-      // Select the newly added client
+      // Select the newly added client (without setting search query)
       onSelectClient(addedClient);
-      setSearchQuery(addedClient.name);
+      setSearchQuery('');
 
       // Reset form
       setNewClient({
@@ -179,7 +179,7 @@ export default function ClientAutocomplete({ selectedClient, onSelectClient, err
               : 'outline-gray-300 dark:outline-slate-600'
           } placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 transition-colors`}
         />
-        {selectedClient && (
+        {searchQuery && (
           <button
             type="button"
             onClick={handleClearSelection}

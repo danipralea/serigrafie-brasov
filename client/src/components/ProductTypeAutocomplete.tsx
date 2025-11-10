@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
@@ -25,10 +25,9 @@ export default function ProductTypeAutocomplete({
   error
 }: ProductTypeAutocompleteProps) {
   const { t } = useTranslation();
-  const { userProfile } = useAuth();
+  const { currentUser, userProfile } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [productTypes, setProductTypes] = useState<ProductTypeOption[]>([]);
-  const [filteredProductTypes, setFilteredProductTypes] = useState<ProductTypeOption[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -54,21 +53,26 @@ export default function ProductTypeAutocomplete({
     fetchCustomProductTypes();
   }, []);
 
-  useEffect(() => {
-    // Filter product types based on search query
-    if (searchQuery) {
+  // Memoize filtered product types to avoid React warning about changing dependency array size
+  const filteredProductTypes = useMemo(() => {
+    if (searchQuery && searchQuery !== selectedProductType?.name) {
       const query = searchQuery.toLowerCase();
-      const filtered = productTypes.filter(pt =>
+      return productTypes.filter(pt =>
         pt.name?.toLowerCase().includes(query) ||
         pt.description?.toLowerCase().includes(query)
       );
-      setFilteredProductTypes(filtered);
+    }
+    return productTypes;
+  }, [searchQuery, productTypes, selectedProductType]);
+
+  // Update dropdown visibility based on search query and selected product
+  useEffect(() => {
+    if (searchQuery && searchQuery !== selectedProductType?.name) {
       setShowDropdown(true);
     } else {
-      setFilteredProductTypes(productTypes);
       setShowDropdown(false);
     }
-  }, [searchQuery, productTypes]);
+  }, [searchQuery, selectedProductType]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -106,6 +110,54 @@ export default function ProductTypeAutocomplete({
     setShowDropdown(false);
   }
 
+  async function handleBlur() {
+    // Only create custom product type if:
+    // 1. User typed something
+    // 2. Nothing is selected yet
+    // 3. There are NO matching results in the dropdown (filteredProductTypes is empty)
+    if (searchQuery.trim() && !selectedProductType && filteredProductTypes.length === 0) {
+      const customName = searchQuery.trim();
+
+      // Save to Firestore so it's available for future orders
+      try {
+        if (!currentUser) {
+          throw new Error('User not authenticated');
+        }
+
+        const productTypesRef = collection(db, 'productTypes');
+        const productTypeDoc = await addDoc(productTypesRef, {
+          name: customName,
+          description: '',
+          userId: currentUser.uid,
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now()
+        });
+
+        const newProductType: ProductTypeOption = {
+          id: productTypeDoc.id,
+          name: customName,
+          isCustom: true
+        };
+
+        // Add to local state
+        setProductTypes([...productTypes, newProductType]);
+
+        // Select the newly created product type
+        onSelectProductType(newProductType);
+      } catch (error) {
+        console.error('Error saving custom product type:', error);
+        // Fallback to temporary custom product type if save fails
+        const customProductType: ProductTypeOption = {
+          id: `custom-${Date.now()}`,
+          name: customName,
+          isCustom: true
+        };
+        onSelectProductType(customProductType);
+      }
+    }
+    setShowDropdown(false);
+  }
+
   function handleClearSelection() {
     onSelectProductType(null);
     setSearchQuery('');
@@ -120,6 +172,11 @@ export default function ProductTypeAutocomplete({
       return;
     }
 
+    if (!currentUser) {
+      alert(t('common.errorNotAuthenticated'));
+      return;
+    }
+
     try {
       setLoading(true);
       const productTypesRef = collection(db, 'productTypes');
@@ -127,6 +184,7 @@ export default function ProductTypeAutocomplete({
       const productTypeDoc = await addDoc(productTypesRef, {
         name: newProductType.name,
         description: newProductType.description,
+        userId: currentUser.uid,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now()
       });
@@ -170,7 +228,13 @@ export default function ProductTypeAutocomplete({
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          onFocus={() => setShowDropdown(true)}
+          onFocus={() => {
+            // Only show dropdown if search query doesn't match selected product
+            if (searchQuery && searchQuery !== selectedProductType?.name) {
+              setShowDropdown(true);
+            }
+          }}
+          onBlur={handleBlur}
           placeholder={t('order.productTypePlaceholder')}
           className={`block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-2 text-base text-gray-900 dark:text-white outline-1 -outline-offset-1 ${
             error
@@ -202,7 +266,10 @@ export default function ProductTypeAutocomplete({
             <button
               key={productType.id}
               type="button"
-              onClick={() => handleSelectProductType(productType)}
+              onMouseDown={(e) => {
+                e.preventDefault(); // Prevent blur from firing before click
+                handleSelectProductType(productType);
+              }}
               className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors"
             >
               <div className="flex items-center justify-between">

@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { PlusIcon } from '@heroicons/react/20/solid';
 import { db } from '../firebase';
-import { collection, addDoc, Timestamp } from 'firebase/firestore';
+import { collection, Timestamp, writeBatch, doc } from 'firebase/firestore';
 import { OrderStatus } from '../types';
 import ClientAutocomplete from './ClientAutocomplete';
 import SubOrderItem, { SubOrderData } from './SubOrderItem';
@@ -29,11 +29,27 @@ export default function PlaceOrderModalV2({ open, onClose, onSuccess }: PlaceOrd
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Parent order data
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [contactPhone, setContactPhone] = useState('');
   const [clientError, setClientError] = useState('');
+
+  // Clear errors when modal opens
+  useEffect(() => {
+    if (open) {
+      setError('');
+      setClientError('');
+    }
+  }, [open]);
+
+  // Scroll to top when error is set
+  useEffect(() => {
+    if (error && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [error]);
 
   // Sub-orders state
   const [subOrders, setSubOrders] = useState<SubOrderData[]>([
@@ -152,8 +168,14 @@ export default function PlaceOrderModalV2({ open, onClose, onSuccess }: PlaceOrd
       setLoading(true);
       setError('');
 
-      // Create parent order
+      // Use batch write for atomic operations
+      const batch = writeBatch(db);
+      const timestamp = Timestamp.now();
+
+      // Create parent order reference
       const ordersRef = collection(db, 'orders');
+      const orderRef = doc(ordersRef);
+
       const orderData = {
         ...clientData,
         userId: currentUser.uid,
@@ -162,16 +184,15 @@ export default function PlaceOrderModalV2({ open, onClose, onSuccess }: PlaceOrd
         status: userProfile?.isAdmin || userProfile?.isTeamMember
           ? OrderStatus.PENDING
           : OrderStatus.PENDING_CONFIRMATION,
-        createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now()
+        createdAt: timestamp,
+        updatedAt: timestamp
       };
 
-      const orderDoc = await addDoc(ordersRef, orderData);
+      batch.set(orderRef, orderData);
 
       // Create sub-orders in subcollection
-      const subOrdersRef = collection(db, 'orders', orderDoc.id, 'subOrders');
-
-      const subOrderPromises = subOrders.map(async (so) => {
+      subOrders.forEach((so) => {
+        const subOrderRef = doc(collection(db, 'orders', orderRef.id, 'subOrders'));
         const subOrderData = {
           productType: so.productType?.id || '',
           productTypeName: so.productType?.name || '',
@@ -186,19 +207,16 @@ export default function PlaceOrderModalV2({ open, onClose, onSuccess }: PlaceOrd
           deliveryTime: so.deliveryTime || null,
           notes: so.notes || '',
           status: OrderStatus.PENDING,
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now()
+          createdAt: timestamp,
+          updatedAt: timestamp
         };
-
-        return addDoc(subOrdersRef, subOrderData);
+        batch.set(subOrderRef, subOrderData);
       });
 
-      await Promise.all(subOrderPromises);
-
       // Create initial order update
-      const updatesRef = collection(db, 'orderUpdates');
-      await addDoc(updatesRef, {
-        orderId: orderDoc.id,
+      const updateRef = doc(collection(db, 'orderUpdates'));
+      batch.set(updateRef, {
+        orderId: orderRef.id,
         userId: currentUser.uid,
         userName: currentUser.displayName || currentUser.email,
         userEmail: currentUser.email,
@@ -206,8 +224,11 @@ export default function PlaceOrderModalV2({ open, onClose, onSuccess }: PlaceOrd
           ? t('dashboard.orderModal.orderCreatedByTeam')
           : t('dashboard.orderModal.orderCreatedByClient'),
         isSystem: true,
-        createdAt: Timestamp.now()
+        createdAt: timestamp
       });
+
+      // Commit all writes atomically
+      await batch.commit();
 
       // Reset form
       setSelectedClient(null);
@@ -227,11 +248,24 @@ export default function PlaceOrderModalV2({ open, onClose, onSuccess }: PlaceOrd
         }
       ]);
 
-      onSuccess({ id: orderDoc.id, ...orderData });
+      onSuccess({ id: orderRef.id, ...orderData });
       onClose();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error creating order:', err);
-      setError(t('placeOrder.orderFailed'));
+
+      // Provide human-readable error messages
+      let errorMessage = t('placeOrder.orderFailed');
+
+      if (err?.code === 'permission-denied' || err?.message?.includes('permission')) {
+        errorMessage = t('placeOrder.errorPermissionDenied');
+      } else if (err?.code === 'unavailable' || err?.message?.includes('network')) {
+        errorMessage = t('placeOrder.errorNetworkIssue');
+      } else if (err?.message) {
+        // For development - show actual error
+        errorMessage = `${t('placeOrder.orderFailed')}: ${err.message}`;
+      }
+
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -242,7 +276,7 @@ export default function PlaceOrderModalV2({ open, onClose, onSuccess }: PlaceOrd
       <div className="fixed inset-0 bg-black/30 dark:bg-black/50" aria-hidden="true" />
 
       <div className="fixed inset-0 flex w-screen items-center justify-center p-4">
-        <DialogPanel className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl bg-white dark:bg-slate-800 shadow-2xl">
+        <DialogPanel ref={scrollContainerRef} className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-xl bg-white dark:bg-slate-800 shadow-2xl">
           {/* Header */}
           <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-6 py-4">
             <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -296,8 +330,16 @@ export default function PlaceOrderModalV2({ open, onClose, onSuccess }: PlaceOrd
                   </div>
 
                   {selectedClient && (
-                    <div className="p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-md">
-                      <div className="text-sm text-blue-900 dark:text-blue-200">
+                    <div className="relative p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-md">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedClient(null)}
+                        className="absolute top-2 right-2 p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-800/50 rounded transition-colors"
+                        aria-label="Remove client"
+                      >
+                        <XMarkIcon className="h-4 w-4" />
+                      </button>
+                      <div className="text-sm text-blue-900 dark:text-blue-200 pr-6">
                         <strong>{selectedClient.name}</strong>
                         {selectedClient.company && <span className="ml-2">• {selectedClient.company}</span>}
                         {selectedClient.email && (
