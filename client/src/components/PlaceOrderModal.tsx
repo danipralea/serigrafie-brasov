@@ -171,8 +171,8 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
       };
     } else {
       // Regular client - use their own info
-      // Prioritize userProfile data over Firebase Auth displayName
-      const clientName = userProfile?.name || currentUser.displayName || currentUser.email || '';
+      // Use current Firebase Auth displayName (AuthContext syncs this to Firestore)
+      const clientName = currentUser.displayName || currentUser.email || '';
 
       clientData = {
         clientId: currentUser.uid,
@@ -196,8 +196,8 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
       const orderRef = doc(ordersRef);
 
       const isAdminOrTeam = userProfile?.isAdmin || userProfile?.isTeamMember;
-      // Prioritize userProfile data for userName as well
-      const userName = userProfile?.name || currentUser.displayName || currentUser.email || '';
+      // Use current Firebase Auth displayName (AuthContext syncs this to Firestore)
+      const userName = currentUser.displayName || currentUser.email || '';
 
       const orderData = {
         ...(isAdminOrTeam && orderName.trim() ? { orderName: orderName.trim() } : {}),

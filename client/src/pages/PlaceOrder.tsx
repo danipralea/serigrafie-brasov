@@ -161,8 +161,8 @@ export default function PlaceOrder() {
       const orderRef = doc(ordersRef);
 
       // Regular client - use their own info
-      // Prioritize userProfile data over Firebase Auth displayName
-      const clientName = userProfile?.name || currentUser.displayName || currentUser.email || '';
+      // Use current Firebase Auth displayName (AuthContext syncs this to Firestore)
+      const clientName = currentUser.displayName || currentUser.email || '';
 
       const orderData = {
         clientId: currentUser.uid,

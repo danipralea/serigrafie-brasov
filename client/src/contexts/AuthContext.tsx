@@ -78,11 +78,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (userDoc.exists()) {
           const existingProfile = userDoc.data() as UserProfile;
 
-          // Update profile if phone number is missing but user has one
-          if (user.phoneNumber && !existingProfile.phoneNumber) {
+          // Update profile if phone number or display name changed
+          const needsUpdate =
+            (user.phoneNumber && !existingProfile.phoneNumber) ||
+            (user.displayName && user.displayName !== existingProfile.displayName);
+
+          if (needsUpdate) {
             const updatedProfile: UserProfile = {
               ...existingProfile,
-              phoneNumber: user.phoneNumber
+              ...(user.phoneNumber && !existingProfile.phoneNumber ? { phoneNumber: user.phoneNumber } : {}),
+              ...(user.displayName && user.displayName !== existingProfile.displayName ? { displayName: user.displayName } : {})
             };
             await setDoc(userDocRef, updatedProfile, { merge: true });
             setUserProfile(updatedProfile);
