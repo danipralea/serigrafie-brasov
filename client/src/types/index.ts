@@ -29,3 +29,55 @@ export const InvitationStatus = {
   DECLINED: 'declined',
   EXPIRED: 'expired'
 };
+
+// Supplier related types
+export interface ContactPerson {
+  name: string;
+  email: string;
+  phone: string;
+}
+
+export interface Supplier {
+  id?: string;
+  name: string;
+  email: string;
+  phone: string;
+  contactPerson?: ContactPerson;
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+export interface SupplierOrderItem {
+  id: string;
+  productType: {
+    id: string;
+    name: string;
+    description?: string;
+    isCustom?: boolean;
+  } | null;
+  quantity: string;
+  client: string; // Text input for client name
+  description: string; // Text area for description
+}
+
+export interface SupplierOrder {
+  id?: string;
+  supplierId: string;
+  supplierName: string;
+  items: SupplierOrderItem[];
+  status: string;
+  createdAt?: any;
+  updatedAt?: any;
+  createdBy?: string;
+}
+
+// Department related types
+export interface Department {
+  id?: string;
+  name: string;
+  managerId: string; // Team member responsible for managing this department
+  managerName?: string; // For display purposes
+  createdAt?: any;
+  updatedAt?: any;
+  createdBy?: string;
+}

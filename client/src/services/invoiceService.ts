@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
+import { formatDate } from '../utils/dateUtils';
 
 export interface InvoiceData {
   orderId: string;
@@ -38,7 +39,7 @@ export function generateInvoicePDF(invoiceData: InvoiceData): jsPDF {
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.text(`Număr factură / Invoice Number: ${invoiceData.orderNumber}`, 20, 65);
-  doc.text(`Data / Date: ${invoiceData.completedAt?.toLocaleDateString('ro-RO') || new Date().toLocaleDateString('ro-RO')}`, 20, 72);
+  doc.text(`Data / Date: ${invoiceData.completedAt ? formatDate(invoiceData.completedAt) : formatDate(new Date())}`, 20, 72);
 
   // Client Information
   doc.setFontSize(12);

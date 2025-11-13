@@ -28,6 +28,15 @@ service cloud.firestore {
       return isAdmin() || isTeamMember();
     }
 
+    function isTeamOwner() {
+      return isAuthenticated() &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isTeamMember == false;
+    }
+
+    function isAdminOrTeamOwner() {
+      return isAdmin() || isTeamOwner();
+    }
+
     // Users collection - ALLOW CREATION for test seeding
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdminOrTeamMember();
@@ -131,6 +140,30 @@ service cloud.firestore {
                        (resource.data.userId == request.auth.uid || isAdmin());
       allow delete: if isAuthenticated() &&
                        (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // Suppliers collection - Only admins and team owners
+    match /suppliers/{supplierId} {
+      allow read: if isAdminOrTeamOwner();
+      allow create: if isAdminOrTeamOwner();
+      allow update: if isAdminOrTeamOwner();
+      allow delete: if isAdminOrTeamOwner();
+    }
+
+    // Supplier Orders collection - Only admins and team owners
+    match /supplierOrders/{orderId} {
+      allow read: if isAdminOrTeamOwner();
+      allow create: if isAdminOrTeamOwner();
+      allow update: if isAdminOrTeamOwner();
+      allow delete: if isAdminOrTeamOwner();
+    }
+
+    // Departments collection - Admins, team owners, and team members can read
+    match /departments/{departmentId} {
+      allow read: if isAdminOrTeamMember();
+      allow create: if isAdminOrTeamOwner();
+      allow update: if isAdminOrTeamOwner();
+      allow delete: if isAdminOrTeamOwner();
     }
 
     // Deny all other access

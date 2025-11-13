@@ -23,13 +23,15 @@ export const db = getFirestore(app);
 export const functions = getFunctions(app);
 export const storage = getStorage(app);
 
-// Connect to emulators in development/test mode
-if (import.meta.env.DEV || window.location.hostname === 'localhost') {
+// Connect to emulators only when explicitly enabled via environment variable
+// This allows:
+// - Dev mode to use production Firebase by default
+// - E2E tests to use emulators (set VITE_USE_EMULATORS=true in test environment)
+if (import.meta.env.VITE_USE_EMULATORS === 'true') {
   connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
   connectFirestoreEmulator(db, 'localhost', 8080);
   connectFunctionsEmulator(functions, 'localhost', 5001);
   connectStorageEmulator(storage, 'localhost', 9199);
-  console.log('🔥 Connected to Firebase Emulators');
 }
 
 export const analytics = getAnalytics(app);

@@ -8,6 +8,7 @@ import { downloadInvoice, sendInvoiceToClient } from '../services/invoiceService
 import { uploadFile } from '../services/storageService';
 import { showSuccess, showError } from '../services/notificationService';
 import ConfirmDialog from './ConfirmDialog';
+import { formatDate } from '../utils/dateUtils';
 
 interface OrderDetailsModalProps {
   isOpen: boolean;
@@ -145,6 +146,19 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
   async function updateOrderStatus(newStatus: string) {
     if (!selectedOrder) return;
 
+    // Check if trying to complete order
+    if (newStatus === OrderStatus.COMPLETED) {
+      // Check if all sub-orders are completed
+      const incompleteSubOrders = selectedOrder.subOrders.filter((subOrder: any) =>
+        subOrder.status !== OrderStatus.COMPLETED
+      );
+
+      if (incompleteSubOrders.length > 0) {
+        showError(t('order.cannotCompleteOrderWithIncompleteSubOrders'));
+        return;
+      }
+    }
+
     try {
       const orderRef = doc(db, 'orders', selectedOrder.id);
       await updateDoc(orderRef, {
@@ -169,6 +183,43 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
     } catch (error) {
       console.error('Error updating order status:', error);
       alert('Failed to update order status');
+    }
+  }
+
+  async function updateSubOrderStatus(subOrderId: string, newStatus: string) {
+    if (!selectedOrder) return;
+
+    try {
+      const subOrderRef = doc(db, 'orders', selectedOrder.id, 'subOrders', subOrderId);
+      await updateDoc(subOrderRef, {
+        status: newStatus,
+        updatedAt: Timestamp.now()
+      });
+
+      // Update local state
+      const updatedSubOrders = selectedOrder.subOrders.map((subOrder: any) =>
+        subOrder.id === subOrderId ? { ...subOrder, status: newStatus } : subOrder
+      );
+      setSelectedOrder({ ...selectedOrder, subOrders: updatedSubOrders });
+
+      // Add system update
+      const updatesRef = collection(db, 'orderUpdates');
+      await addDoc(updatesRef, {
+        orderId: selectedOrder.id,
+        userId: currentUser!.uid,
+        userName: t('dashboard.orderModal.system'),
+        userEmail: currentUser!.email,
+        text: `${t('order.subOrderStatusChanged')} ${getStatusLabel(newStatus)}`,
+        isSystem: true,
+        createdAt: Timestamp.now()
+      });
+
+      await fetchOrderUpdates(selectedOrder.id);
+      if (onOrderUpdated) onOrderUpdated();
+      showSuccess(t('order.subOrderStatusUpdated'));
+    } catch (error) {
+      console.error('Error updating sub-order status:', error);
+      showError(t('order.errorUpdatingSubOrderStatus'));
     }
   }
 
@@ -367,7 +418,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                 {t('dashboard.orderModal.created')} {(() => {
                   const date = selectedOrder.createdAt?.toDate();
                   if (!date) return '';
-                  const dateStr = date.toLocaleDateString('ro-RO');
+                  const dateStr = formatDate(date);
                   const timeStr = date.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
                   return `${dateStr} - ${timeStr}`;
                 })()}
@@ -463,6 +514,15 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                           <span className="text-gray-600 dark:text-slate-400">{t('placeOrder.quantity')}:</span>
                           <span className="text-gray-900 dark:text-white font-medium">{subOrder.quantity}</span>
                         </div>
+                        {subOrder.departmentName && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-600 dark:text-slate-400">{t('order.department')}:</span>
+                            <span className="text-gray-900 dark:text-white font-medium">
+                              {subOrder.departmentName}
+                              {subOrder.departmentManagerName && ` (${subOrder.departmentManagerName})`}
+                            </span>
+                          </div>
+                        )}
                         {(subOrder.length || subOrder.width || subOrder.cmp) && (
                           <div className="flex justify-between">
                             <span className="text-gray-600 dark:text-slate-400">{t('placeOrder.length')} / {t('placeOrder.width')} / {t('placeOrder.cmp')}:</span>
@@ -511,6 +571,31 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                           </div>
                         )}
                       </div>
+
+                      {/* Sub-order Status Update - Only for Admin/Team Members */}
+                      {(userProfile?.isAdmin || userProfile?.isTeamMember) && (
+                        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-slate-600">
+                          <h6 className="text-xs font-semibold text-gray-700 dark:text-slate-300 mb-2 uppercase tracking-wide">
+                            {t('order.updateSubOrderStatus')}
+                          </h6>
+                          <div className="flex gap-2 flex-wrap">
+                            {Object.values(OrderStatus).map((status) => (
+                              <button
+                                key={status}
+                                onClick={() => updateSubOrderStatus(subOrder.id, status)}
+                                disabled={subOrder.status === status || status === OrderStatus.PENDING_CONFIRMATION}
+                                className={`px-2.5 py-1 text-xs rounded-lg transition-colors ${
+                                  subOrder.status === status || status === OrderStatus.PENDING_CONFIRMATION
+                                    ? 'bg-gray-200 dark:bg-slate-600 text-gray-500 dark:text-slate-400 cursor-not-allowed'
+                                    : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-600'
+                                }`}
+                              >
+                                {getStatusLabel(status)}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -680,7 +765,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                                 {(() => {
                                   const date = update.createdAt?.toDate();
                                   if (!date) return '';
-                                  const dateStr = date.toLocaleDateString('ro-RO');
+                                  const dateStr = formatDate(date);
                                   const timeStr = date.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
                                   return `${dateStr} - ${timeStr}`;
                                 })()}

@@ -20,7 +20,9 @@
     "showDetails": "Show details",
     "or": "or",
     "custom": "Custom",
-    "optional": "(optional)"
+    "optional": "(optional)",
+    "actions": "Actions",
+    "permissionDenied": "You don't have permission to perform this action"
   },
   "order": {
     "createNewOrder": "Create New Order",
@@ -36,6 +38,8 @@
     "removeSubOrder": "Remove Item",
     "contactPhone": "Contact Phone",
     "contactPhoneHelp": "Override client's phone number if different for this order",
+    "department": "Department",
+    "selectDepartment": "Select department...",
     "createOrder": "Create Order",
     "productTypePlaceholder": "Search for a product type...",
     "addNewProductType": "Add New Product Type",
@@ -44,7 +48,12 @@
     "errorAtLeastOneSubOrder": "Please add at least one order item",
     "errorProductTypeRequired": "Product type is required",
     "errorQuantityRequired": "Quantity must be at least 1",
-    "errorDeliveryTimeRequired": "Delivery time is required"
+    "errorDeliveryTimeRequired": "Delivery time is required",
+    "cannotCompleteOrderWithIncompleteSubOrders": "Cannot complete order until all items are completed",
+    "subOrderStatusChanged": "Item status changed to:",
+    "subOrderStatusUpdated": "Item status updated successfully",
+    "errorUpdatingSubOrderStatus": "Error updating item status",
+    "updateSubOrderStatus": "Update item status"
   },
   "productType": {
     "name": "Product Name",
@@ -145,6 +154,7 @@
     "orders": "Orders",
     "calendar": "Calendar",
     "clients": "Clients",
+    "suppliers": "Suppliers",
     "team": "Team",
     "placeOrder": "Place Order",
     "inviteTeam": "Invite Team",
@@ -426,6 +436,10 @@
     "owner": "Owner",
     "admin": "Admin",
     "member": "Member",
+    "tabs": {
+      "team": "Team",
+      "departments": "Departments"
+    },
     "role": {
       "owner": "Owner",
       "admin": "Admin",
@@ -465,6 +479,32 @@
       "invitationSent": "Invitation sent to",
       "invitationCreated": "Invitation created! Share this link with",
       "expiryNote": "The invitation will expire in 7 days. The invitee will receive an email with a link to accept the invitation."
+    }
+  },
+  "departments": {
+    "title": "Departments",
+    "addDepartment": "Add Department",
+    "noDepartments": "No departments yet. Add one to get started!",
+    "manager": "Manager",
+    "deleteFailed": "Failed to delete department",
+    "modal": {
+      "title": "Add Department",
+      "name": "Department Name",
+      "namePlaceholder": "e.g. Production, Sales",
+      "manager": "Responsible Member",
+      "selectManager": "Select a member",
+      "add": "Add",
+      "adding": "Adding...",
+      "addSuccess": "Department added successfully!",
+      "errorNameRequired": "Department name is required",
+      "errorManagerRequired": "Responsible member is required",
+      "errorFailed": "Failed to add department"
+    },
+    "deleteDialog": {
+      "title": "Delete Department",
+      "message": "Are you sure you want to delete this department? This action cannot be undone.",
+      "confirm": "Delete Department",
+      "cancel": "Cancel"
     }
   },
   "invite": {
@@ -649,5 +689,131 @@
       "invitationCreated": "Invitation created for",
       "expiryNote": "This invitation will expire in 30 days."
     }
+  },
+  "suppliers": {
+    "title": "Suppliers",
+    "subtitle": "Manage your suppliers and supplier orders",
+    "addSupplier": "Add Supplier",
+    "addSupplierOrder": "New Supplier Order",
+    "allSuppliers": "All Suppliers",
+    "supplierOrders": "Supplier Orders",
+    "noSuppliers": "No suppliers found",
+    "noSuppliersDesc": "Get started by adding your first supplier.",
+    "noSupplierOrders": "No supplier orders found",
+    "noSupplierOrdersDesc": "Get started by creating your first supplier order.",
+    "adjustFilters": "Try adjusting your filters.",
+    "search": "Search",
+    "searchPlaceholder": "Search by name, email, phone...",
+    "sortBy": "Sort by",
+    "dateNewest": "Date (Newest First)",
+    "dateOldest": "Date (Oldest First)",
+    "nameAZ": "Name (A-Z)",
+    "nameZA": "Name (Z-A)",
+    "added": "Added",
+    "deleteSupplier": "Delete supplier",
+    "deleteError": "Failed to delete supplier",
+    "deleteDialog": {
+      "title": "Delete Supplier",
+      "message": "Are you sure you want to delete this supplier? This action cannot be undone.",
+      "confirm": "Delete",
+      "cancel": "Cancel"
+    },
+    "deleteOrderDialog": {
+      "title": "Delete Supplier Order",
+      "message": "Are you sure you want to delete this supplier order? This action cannot be undone.",
+      "confirm": "Delete",
+      "cancel": "Cancel"
+    },
+    "deleteOrderSuccess": "Supplier order deleted successfully",
+    "deleteOrderError": "Failed to delete supplier order",
+    "finaliseOrder": "Finalise",
+    "finaliseOrderSuccess": "Supplier order finalised successfully",
+    "finaliseOrderError": "Failed to finalise supplier order",
+    "activeOrders": "Active",
+    "finalisedOrders": "Finalised",
+    "addModal": {
+      "title": "Add New Supplier",
+      "name": "Supplier Name",
+      "namePlaceholder": "Supplier Inc.",
+      "email": "Email",
+      "emailPlaceholder": "contact@supplier.com",
+      "phone": "Phone",
+      "phonePlaceholder": "+1 234 567 8900",
+      "address": "Address",
+      "addressPlaceholder": "123 Main St, City, Country",
+      "contactPerson": "Contact Person",
+      "contactPersonName": "Contact Person Name",
+      "contactPersonNamePlaceholder": "John Doe",
+      "contactPersonEmail": "Contact Person Email",
+      "contactPersonEmailPlaceholder": "john.doe@supplier.com",
+      "contactPersonPhone": "Contact Person Phone",
+      "contactPersonPhonePlaceholder": "+1 234 567 8900",
+      "notes": "Notes",
+      "notesPlaceholder": "Additional notes about the supplier...",
+      "cancel": "Cancel",
+      "add": "Add Supplier",
+      "adding": "Adding...",
+      "errorName": "Supplier name is required",
+      "errorEmail": "Please enter a valid email address",
+      "errorPhone": "Phone is required",
+      "errorContactPersonEmail": "Please enter a valid email address for the contact person",
+      "errorFailed": "Failed to add supplier. Please try again.",
+      "addSuccess": "Supplier added successfully"
+    },
+    "editModal": {
+      "title": "Edit Supplier",
+      "save": "Save Changes",
+      "saving": "Saving...",
+      "updateSuccess": "Supplier updated successfully"
+    },
+    "orderModal": {
+      "title": "New Supplier Order",
+      "supplier": "Supplier",
+      "supplierPlaceholder": "Search for a supplier...",
+      "addNewSupplier": "Add New Supplier",
+      "orderItems": "Order Items",
+      "addItem": "Add Item",
+      "removeItem": "Remove Item",
+      "productType": "Product Type",
+      "productTypePlaceholder": "Search for a product type...",
+      "quantity": "Quantity",
+      "quantityPlaceholder": "100",
+      "client": "Client",
+      "clientPlaceholder": "Which client is this order for...",
+      "description": "Description",
+      "descriptionPlaceholder": "Details about the order...",
+      "notes": "Additional Notes",
+      "notesPlaceholder": "Additional notes about the order...",
+      "totalAmount": "Total Amount (RON)",
+      "totalAmountPlaceholder": "1000",
+      "cancel": "Cancel",
+      "create": "Create Order",
+      "creating": "Creating...",
+      "errorSupplierRequired": "Please select a supplier",
+      "errorAtLeastOneItem": "Please add at least one item",
+      "errorProductTypeRequired": "Product type is required",
+      "errorQuantityRequired": "Quantity is required",
+      "errorClientRequired": "Client is required",
+      "errorFailed": "Failed to create order. Please try again.",
+      "createSuccess": "Order created successfully"
+    },
+    "orderDetails": {
+      "title": "Supplier Order Details",
+      "supplier": "Supplier",
+      "items": "Items",
+      "item": "Item",
+      "productType": "Product Type",
+      "quantity": "Quantity",
+      "client": "Client",
+      "description": "Description",
+      "totalAmount": "Total Amount",
+      "notes": "Notes",
+      "status": "Status",
+      "createdBy": "Created By",
+      "createdAt": "Created At",
+      "updatedAt": "Updated At",
+      "orderInfo": "Order Information"
+    },
+    "deleteOrder": "Delete Order"
   }
 }

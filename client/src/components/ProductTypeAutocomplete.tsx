@@ -178,9 +178,7 @@ export default function ProductTypeAutocomplete({
     setShowDropdown(false);
   }
 
-  async function handleAddNewProductType(e: React.FormEvent) {
-    e.preventDefault();
-
+  async function handleAddNewProductType() {
     if (!newProductType.name.trim()) {
       alert(t('productType.errorName'));
       return;
@@ -329,7 +327,7 @@ export default function ProductTypeAutocomplete({
 
               {showAddForm && (
                 <div className="mt-3 p-4 bg-gray-50 dark:bg-slate-700/50 rounded-md border border-gray-300 dark:border-slate-600">
-                  <form onSubmit={handleAddNewProductType} className="space-y-3">
+                  <div className="space-y-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         {t('productType.name')} *
@@ -369,14 +367,15 @@ export default function ProductTypeAutocomplete({
                         {t('common.cancel')}
                       </button>
                       <button
-                        type="submit"
+                        type="button"
+                        onClick={handleAddNewProductType}
                         disabled={loading}
                         className="flex-1 px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-cyan-500 rounded-md hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
                       >
                         {loading ? t('productType.adding') : t('productType.add')}
                       </button>
                     </div>
-                  </form>
+                  </div>
                 </div>
               )}
             </>

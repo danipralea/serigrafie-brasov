@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { collection, query, where, onSnapshot, orderBy, updateDoc, doc, limit } from 'firebase/firestore';
+import { formatDate } from '../utils/dateUtils';
 
 export default function Notifications({ onNotificationClick }) {
   const { currentUser } = useAuth();
@@ -165,7 +166,7 @@ export default function Notifications({ onNotificationClick }) {
                           {(() => {
                             const date = notification.createdAt?.toDate();
                             if (!date) return '';
-                            const dateStr = date.toLocaleDateString('ro-RO');
+                            const dateStr = formatDate(date);
                             const timeStr = date.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
                             return `${dateStr} - ${timeStr}`;
                           })()}

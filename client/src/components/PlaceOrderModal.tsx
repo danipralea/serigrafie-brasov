@@ -5,8 +5,8 @@ import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { PlusIcon } from '@heroicons/react/20/solid';
 import { db } from '../firebase';
-import { collection, Timestamp, writeBatch, doc } from 'firebase/firestore';
-import { OrderStatus } from '../types';
+import { collection, Timestamp, writeBatch, doc, query, where, getDocs } from 'firebase/firestore';
+import { OrderStatus, Department } from '../types';
 import ClientAutocomplete from './ClientAutocomplete';
 import SubOrderItem, { SubOrderData } from './SubOrderItem';
 
@@ -38,6 +38,9 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
   const [clientError, setClientError] = useState('');
   const [orderNameError, setOrderNameError] = useState('');
 
+  // Departments data
+  const [departments, setDepartments] = useState<Department[]>([]);
+
   // Clear errors and pre-fill phone when modal opens
   useEffect(() => {
     if (open) {
@@ -49,8 +52,42 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
       if (currentUser?.phoneNumber && !contactPhone) {
         setContactPhone(currentUser.phoneNumber);
       }
+
+      // Fetch departments for admin/team members
+      if ((userProfile?.isAdmin || userProfile?.isTeamMember) && currentUser) {
+        fetchDepartments();
+      }
     }
-  }, [open, currentUser, contactPhone]);
+  }, [open, currentUser, contactPhone, userProfile]);
+
+  async function fetchDepartments() {
+    if (!currentUser) return;
+
+    try {
+      // Determine whose departments to fetch
+      let ownerId = currentUser.uid;
+
+      // If user is a team member, fetch team owner's departments
+      if (userProfile?.isTeamMember && userProfile?.teamOwnerId) {
+        ownerId = userProfile.teamOwnerId;
+      }
+
+      const departmentsRef = collection(db, 'departments');
+      const departmentsQuery = query(
+        departmentsRef,
+        where('createdBy', '==', ownerId)
+      );
+      const snapshot = await getDocs(departmentsQuery);
+      const depts = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Department));
+      setDepartments(depts);
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+      // Don't show error to user, departments are optional
+    }
+  }
 
   // Scroll to top when error is set
   useEffect(() => {
@@ -231,6 +268,8 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
           designFilePath: so.designFilePath || '',
           deliveryTime: so.deliveryTime || null,
           notes: so.notes || '',
+          departmentId: so.departmentId || null,
+          departmentName: so.departmentName || null,
           status: OrderStatus.PENDING,
           createdAt: timestamp,
           updatedAt: timestamp
@@ -469,6 +508,7 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
                     onChange={handleSubOrderChange}
                     onRemove={handleRemoveSubOrder}
                     canRemove={subOrders.length > 1}
+                    departments={departments}
                   />
                 ))}
               </div>

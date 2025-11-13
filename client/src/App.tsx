@@ -11,6 +11,7 @@ import Profile from './pages/Profile';
 import AcceptInvitation from './pages/AcceptInvitation';
 import TeamManagement from './pages/TeamManagement';
 import Clients from './pages/Clients';
+import Suppliers from './pages/Suppliers';
 
 function App() {
   return (
@@ -59,6 +60,14 @@ function App() {
             element={
               <PrivateRoute>
                 <Clients />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/suppliers"
+            element={
+              <PrivateRoute>
+                <Suppliers />
               </PrivateRoute>
             }
           />

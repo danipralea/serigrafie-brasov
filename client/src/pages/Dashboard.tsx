@@ -14,6 +14,7 @@ import OrderDetailsModal from '../components/OrderDetailsModal';
 import { downloadInvoice, sendInvoiceToClient } from '../services/invoiceService';
 import { uploadFile } from '../services/storageService';
 import { showSuccess, showError } from '../services/notificationService';
+import { formatDate } from '../utils/dateUtils';
 
 export default function Dashboard() {
   const { currentUser, userProfile } = useAuth();
@@ -907,7 +908,7 @@ export default function Dashboard() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
                           {earliestDelivery ? (
                             <>
-                              <div>{new Date(earliestDelivery).toLocaleDateString('ro-RO')}</div>
+                              <div>{formatDate(new Date(earliestDelivery))}</div>
                               <div className="text-xs text-slate-400 dark:text-slate-500">
                                 {new Date(earliestDelivery).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}
                               </div>
@@ -923,7 +924,7 @@ export default function Dashboard() {
                           {(() => {
                             const date = order.createdAt?.toDate();
                             if (!date) return '';
-                            const dateStr = date.toLocaleDateString('ro-RO');
+                            const dateStr = formatDate(date);
                             const timeStr = date.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
                             return `${dateStr} - ${timeStr}`;
                           })()}

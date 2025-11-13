@@ -24,6 +24,17 @@ export interface SubOrderData {
   designFilePath?: string;
   deliveryTime: string;
   notes: string;
+  departmentId?: string;
+  departmentName?: string;
+  departmentManagerName?: string;
+  status?: string;
+}
+
+interface Department {
+  id: string;
+  name: string;
+  managerId: string;
+  managerName?: string;
 }
 
 interface SubOrderItemProps {
@@ -32,9 +43,10 @@ interface SubOrderItemProps {
   onChange: (id: string, field: string, value: any) => void;
   onRemove: (id: string) => void;
   canRemove: boolean;
+  departments?: Department[];
 }
 
-export default function SubOrderItem({ subOrder, index, onChange, onRemove, canRemove }: SubOrderItemProps) {
+export default function SubOrderItem({ subOrder, index, onChange, onRemove, canRemove, departments = [] }: SubOrderItemProps) {
   const { t } = useTranslation();
   const { currentUser, userProfile } = useAuth();
   const [uploadingFile, setUploadingFile] = useState(false);
@@ -101,6 +113,32 @@ export default function SubOrderItem({ subOrder, index, onChange, onRemove, canR
             userProfile={userProfile}
           />
         </div>
+
+        {/* Department Selection - Only for Admin/Team Members */}
+        {(userProfile?.isAdmin || userProfile?.isTeamMember) && departments.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
+              {t('order.department')} {t('common.optional')}
+            </label>
+            <select
+              value={subOrder.departmentId || ''}
+              onChange={(e) => {
+                const selectedDept = departments.find(d => d.id === e.target.value);
+                handleChange('departmentId', e.target.value || undefined);
+                handleChange('departmentName', selectedDept?.name || undefined);
+                handleChange('departmentManagerName', selectedDept?.managerName || undefined);
+              }}
+              className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-2 text-sm text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 transition-colors"
+            >
+              <option value="">{t('order.selectDepartment')}</option>
+              {departments.map((dept) => (
+                <option key={dept.id} value={dept.id}>
+                  {dept.name} {dept.managerName && `(${dept.managerName})`}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Quantity, Length, Width, CMP in grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

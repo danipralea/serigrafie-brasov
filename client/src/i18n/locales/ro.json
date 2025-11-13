@@ -20,7 +20,9 @@
     "showDetails": "Vezi detalii",
     "or": "sau",
     "custom": "Personalizat",
-    "optional": "(opțional)"
+    "optional": "(opțional)",
+    "actions": "Acțiuni",
+    "permissionDenied": "Nu ai permisiunea necesară pentru această acțiune"
   },
   "auth": {
     "signIn": "Autentificare",
@@ -110,6 +112,7 @@
     "orders": "Comenzi",
     "calendar": "Calendar",
     "clients": "Clienți",
+    "suppliers": "Furnizori",
     "team": "Echipă",
     "placeOrder": "Comandă nouă",
     "inviteTeam": "Invită echipă",
@@ -256,6 +259,8 @@
     "removeSubOrder": "Șterge articol",
     "contactPhone": "Telefon contact",
     "contactPhoneHelp": "Lasă gol pentru a folosi numărul de telefon al clientului",
+    "department": "Departament",
+    "selectDepartment": "Selectează departament...",
     "createOrder": "Creează comandă",
     "productTypePlaceholder": "Caută un tip de produs...",
     "addNewProductType": "Adaugă tip de produs nou",
@@ -264,7 +269,12 @@
     "errorAtLeastOneSubOrder": "Te rugăm să adaugi cel puțin un articol",
     "errorProductTypeRequired": "Tipul de produs este obligatoriu",
     "errorQuantityRequired": "Cantitatea este obligatorie și trebuie să fie mai mare de 0",
-    "errorDeliveryTimeRequired": "Data și ora livrării este obligatorie"
+    "errorDeliveryTimeRequired": "Data și ora livrării este obligatorie",
+    "cannotCompleteOrderWithIncompleteSubOrders": "Nu poți finaliza comanda până când toate articolele nu sunt finalizate",
+    "subOrderStatusChanged": "Status articol schimbat la:",
+    "subOrderStatusUpdated": "Status articol actualizat cu succes",
+    "errorUpdatingSubOrderStatus": "Eroare la actualizarea statusului articolului",
+    "updateSubOrderStatus": "Actualizare status articol"
   },
   "orderStatus": {
     "pending_confirmation": "așteaptă confirmare",
@@ -426,6 +436,10 @@
     "owner": "Proprietar",
     "admin": "Administrator",
     "member": "Membru",
+    "tabs": {
+      "team": "Echipă",
+      "departments": "Departamente"
+    },
     "role": {
       "owner": "Proprietar",
       "admin": "Administrator",
@@ -465,6 +479,32 @@
       "invitationSent": "Invitație trimisă către",
       "invitationCreated": "Invitație creată! Trimite acest link către",
       "expiryNote": "Invitația va expira în 7 zile. Destinatarul va primi un email cu un link pentru acceptarea invitației."
+    }
+  },
+  "departments": {
+    "title": "Departamente",
+    "addDepartment": "Adaugă departament",
+    "noDepartments": "Niciun departament încă. Adaugă unul pentru a începe!",
+    "manager": "Manager",
+    "deleteFailed": "Eroare la ștergerea departamentului",
+    "modal": {
+      "title": "Adaugă departament",
+      "name": "Nume departament",
+      "namePlaceholder": "ex: Producție, Vânzări",
+      "manager": "Membru responsabil",
+      "selectManager": "Selectează un membru",
+      "add": "Adaugă",
+      "adding": "Se adaugă...",
+      "addSuccess": "Departament adăugat cu succes!",
+      "errorNameRequired": "Numele departamentului este obligatoriu",
+      "errorManagerRequired": "Membrul responsabil este obligatoriu",
+      "errorFailed": "Eroare la adăugarea departamentului"
+    },
+    "deleteDialog": {
+      "title": "Șterge departament",
+      "message": "Sigur dorești să ștergi acest departament? Această acțiune nu poate fi anulată.",
+      "confirm": "Șterge departament",
+      "cancel": "Anulează"
     }
   },
   "invite": {
@@ -649,5 +689,131 @@
       "invitationCreated": "Invitație creată pentru",
       "expiryNote": "Invitația va expira în 30 de zile."
     }
+  },
+  "suppliers": {
+    "title": "Furnizori",
+    "subtitle": "Gestionează furnizorii și comenzile către furnizori",
+    "addSupplier": "Adaugă furnizor",
+    "addSupplierOrder": "Comandă nouă către furnizor",
+    "allSuppliers": "Toți furnizorii",
+    "supplierOrders": "Comenzi furnizori",
+    "noSuppliers": "Niciun furnizor găsit",
+    "noSuppliersDesc": "Începe prin adăugarea primului furnizor.",
+    "noSupplierOrders": "Nicio comandă către furnizori găsită",
+    "noSupplierOrdersDesc": "Începe prin crearea primei comenzi către un furnizor.",
+    "adjustFilters": "Încearcă să ajustezi filtrele.",
+    "search": "Caută",
+    "searchPlaceholder": "Caută după nume, email, telefon...",
+    "sortBy": "Sortează după",
+    "dateNewest": "Dată (Cele mai noi)",
+    "dateOldest": "Dată (Cele mai vechi)",
+    "nameAZ": "Nume (A-Z)",
+    "nameZA": "Nume (Z-A)",
+    "added": "Adăugat",
+    "deleteSupplier": "Șterge furnizor",
+    "deleteError": "Eroare la ștergerea furnizorului",
+    "deleteDialog": {
+      "title": "Șterge furnizor",
+      "message": "Sigur dorești să ștergi acest furnizor? Această acțiune nu poate fi anulată.",
+      "confirm": "Șterge",
+      "cancel": "Anulează"
+    },
+    "deleteOrderDialog": {
+      "title": "Șterge comandă furnizor",
+      "message": "Sigur dorești să ștergi această comandă către furnizor? Această acțiune nu poate fi anulată.",
+      "confirm": "Șterge",
+      "cancel": "Anulează"
+    },
+    "deleteOrderSuccess": "Comandă furnizor ștearsă cu succes",
+    "deleteOrderError": "Eroare la ștergerea comenzii către furnizor",
+    "finaliseOrder": "Finalizează",
+    "finaliseOrderSuccess": "Comandă furnizor finalizată cu succes",
+    "finaliseOrderError": "Eroare la finalizarea comenzii către furnizor",
+    "activeOrders": "Active",
+    "finalisedOrders": "Finalizate",
+    "addModal": {
+      "title": "Adaugă furnizor nou",
+      "name": "Nume furnizor",
+      "namePlaceholder": "SC Furnizor SRL",
+      "email": "Email",
+      "emailPlaceholder": "contact@furnizor.ro",
+      "phone": "Telefon",
+      "phonePlaceholder": "+40 712 345 678",
+      "address": "Adresă",
+      "addressPlaceholder": "Str. Exemplu nr. 1, București",
+      "contactPerson": "Persoană de contact",
+      "contactPersonName": "Nume persoană de contact",
+      "contactPersonNamePlaceholder": "Ion Popescu",
+      "contactPersonEmail": "Email persoană de contact",
+      "contactPersonEmailPlaceholder": "ion.popescu@furnizor.ro",
+      "contactPersonPhone": "Telefon persoană de contact",
+      "contactPersonPhonePlaceholder": "+40 712 345 678",
+      "notes": "Notițe",
+      "notesPlaceholder": "Notițe adiționale despre furnizor...",
+      "cancel": "Anulează",
+      "add": "Adaugă furnizor",
+      "adding": "Se adaugă...",
+      "errorName": "Numele furnizorului este obligatoriu",
+      "errorEmail": "Te rugăm să introduci o adresă de email validă",
+      "errorPhone": "Telefonul este obligatoriu",
+      "errorContactPersonEmail": "Te rugăm să introduci o adresă de email validă pentru persoana de contact",
+      "errorFailed": "Eroare la adăugarea furnizorului. Te rugăm să încerci din nou.",
+      "addSuccess": "Furnizor adăugat cu succes"
+    },
+    "editModal": {
+      "title": "Editează furnizor",
+      "save": "Salvează modificări",
+      "saving": "Se salvează...",
+      "updateSuccess": "Furnizor actualizat cu succes"
+    },
+    "orderModal": {
+      "title": "Comandă nouă către furnizor",
+      "supplier": "Furnizor",
+      "supplierPlaceholder": "Caută un furnizor...",
+      "addNewSupplier": "Adaugă furnizor nou",
+      "orderItems": "Articole comandă",
+      "addItem": "Adaugă articol",
+      "removeItem": "Șterge articol",
+      "productType": "Tip produs",
+      "productTypePlaceholder": "Caută un tip de produs...",
+      "quantity": "Cantitate",
+      "quantityPlaceholder": "100",
+      "client": "Client",
+      "clientPlaceholder": "Pentru ce client este comanda...",
+      "description": "Descriere",
+      "descriptionPlaceholder": "Detalii despre comandă...",
+      "notes": "Notițe adiționale",
+      "notesPlaceholder": "Notițe adiționale despre comandă...",
+      "totalAmount": "Valoare totală (RON)",
+      "totalAmountPlaceholder": "1000",
+      "cancel": "Anulează",
+      "create": "Creează comandă",
+      "creating": "Se creează...",
+      "errorSupplierRequired": "Te rugăm să selectezi un furnizor",
+      "errorAtLeastOneItem": "Te rugăm să adaugi cel puțin un articol",
+      "errorProductTypeRequired": "Tipul de produs este obligatoriu",
+      "errorQuantityRequired": "Cantitatea este obligatorie",
+      "errorClientRequired": "Clientul este obligatoriu",
+      "errorFailed": "Eroare la crearea comenzii. Te rugăm să încerci din nou.",
+      "createSuccess": "Comandă creată cu succes"
+    },
+    "orderDetails": {
+      "title": "Detalii comandă furnizor",
+      "supplier": "Furnizor",
+      "items": "Articole",
+      "item": "Articol",
+      "productType": "Tip produs",
+      "quantity": "Cantitate",
+      "client": "Client",
+      "description": "Descriere",
+      "totalAmount": "Valoare totală",
+      "notes": "Notițe",
+      "status": "Status",
+      "createdBy": "Creat de",
+      "createdAt": "Creat la",
+      "updatedAt": "Actualizat la",
+      "orderInfo": "Informații comandă"
+    },
+    "deleteOrder": "Șterge comandă"
   }
 }

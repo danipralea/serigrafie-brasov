@@ -8,6 +8,7 @@ import { OrderStatus, ProductType } from '../types';
 import AppShell from '../components/AppShell';
 import OrderDetailsModal from '../components/OrderDetailsModal';
 import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
+import { formatMonthYear } from '../utils/dateUtils';
 
 const PRODUCT_COLORS: { [key: string]: string } = {
   [ProductType.MUGS]: '#8b5cf6',
@@ -233,7 +234,7 @@ export default function Calendar() {
   }
 
   const days = viewMode === 'week' ? getDaysInWeek() : getDaysInMonth();
-  const monthYear = currentDate.toLocaleDateString('ro-RO', { month: 'long', year: 'numeric' });
+  const monthYear = formatMonthYear(currentDate, 'ro-RO');
 
   return (
     <AppShell title={t('calendar.title')}>
