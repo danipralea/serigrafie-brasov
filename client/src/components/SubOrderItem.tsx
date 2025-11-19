@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PhotoIcon, TrashIcon } from '@heroicons/react/24/solid';
 import ProductTypeAutocomplete from './ProductTypeAutocomplete';
@@ -46,7 +46,7 @@ interface SubOrderItemProps {
   departments?: Department[];
 }
 
-export default function SubOrderItem({ subOrder, index, onChange, onRemove, canRemove, departments = [] }: SubOrderItemProps) {
+function SubOrderItem({ subOrder, index, onChange, onRemove, canRemove, departments = [] }: SubOrderItemProps) {
   const { t } = useTranslation();
   const { currentUser, userProfile } = useAuth();
   const [uploadingFile, setUploadingFile] = useState(false);
@@ -91,6 +91,7 @@ export default function SubOrderItem({ subOrder, index, onChange, onRemove, canR
         </h4>
         {canRemove && (
           <button
+            data-testid={`sub-order-remove-button-${index}`}
             type="button"
             onClick={() => onRemove(subOrder.id)}
             className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md transition-colors"
@@ -147,6 +148,7 @@ export default function SubOrderItem({ subOrder, index, onChange, onRemove, canR
               {t('placeOrder.quantity')} *
             </label>
             <input
+              data-testid={`sub-order-quantity-${index}`}
               type="number"
               value={subOrder.quantity}
               onChange={(e) => handleChange('quantity', e.target.value)}
@@ -205,6 +207,7 @@ export default function SubOrderItem({ subOrder, index, onChange, onRemove, canR
             {t('placeOrder.description')}
           </label>
           <textarea
+            data-testid={`sub-order-description-${index}`}
             value={subOrder.description}
             onChange={(e) => handleChange('description', e.target.value)}
             rows={3}
@@ -290,6 +293,7 @@ export default function SubOrderItem({ subOrder, index, onChange, onRemove, canR
             {t('placeOrder.deliveryTime')} *
           </label>
           <input
+            data-testid={`sub-order-delivery-time-${index}`}
             type="datetime-local"
             value={subOrder.deliveryTime}
             onChange={(e) => handleChange('deliveryTime', e.target.value)}
@@ -315,3 +319,6 @@ export default function SubOrderItem({ subOrder, index, onChange, onRemove, canR
     </div>
   );
 }
+
+// Wrap with React.memo to prevent unnecessary re-renders
+export default memo(SubOrderItem);

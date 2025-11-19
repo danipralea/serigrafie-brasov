@@ -11,6 +11,7 @@ import {
   RecaptchaVerifier,
   signInWithPhoneNumber,
   User,
+  UserCredential,
   ConfirmationResult
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs } from 'firebase/firestore';
@@ -29,6 +30,7 @@ interface UserProfile {
   displayName: string | null;
   isTeamMember: boolean;
   isAdmin: boolean;
+  teamOwnerId?: string | null;
   createdAt: Date;
   photoURL?: string | null;
 }
@@ -36,9 +38,9 @@ interface UserProfile {
 interface AuthContextType {
   currentUser: User | null;
   userProfile: UserProfile | null;
-  login: (email: string, password: string) => Promise<any>;
-  signup: (email: string, password: string) => Promise<any>;
-  loginWithGoogle: () => Promise<any>;
+  login: (email: string, password: string) => Promise<UserCredential>;
+  signup: (email: string, password: string) => Promise<UserCredential>;
+  loginWithGoogle: () => Promise<UserCredential>;
   logout: () => Promise<void>;
   deleteAccount: () => Promise<void>;
   sendPasswordResetEmail: (email: string) => Promise<void>;
@@ -117,23 +119,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return unsubscribe;
   }, []);
 
-  async function login(email: string, password: string) {
+  async function login(email: string, password: string): Promise<UserCredential> {
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
       return result;
-    } catch (error: any) {
-      console.error('Login failed with error code:', error.code);
-      console.error('Error message:', error.message);
-      console.error('Full error:', error);
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        const firebaseError = error as { code?: string; message?: string };
+        console.error('Login failed with error code:', firebaseError.code);
+        console.error('Error message:', firebaseError.message);
+        console.error('Full error:', error);
+      }
       throw error;
     }
   }
 
-  async function signup(email: string, password: string) {
+  async function signup(email: string, password: string): Promise<UserCredential> {
     return createUserWithEmailAndPassword(auth, email, password);
   }
 
-  async function loginWithGoogle() {
+  async function loginWithGoogle(): Promise<UserCredential> {
     const provider = new GoogleAuthProvider();
     return signInWithPopup(auth, provider);
   }
@@ -177,13 +182,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
-  async function sendPasswordResetEmail(email: string) {
+  async function sendPasswordResetEmail(email: string): Promise<void> {
     try {
       await firebaseSendPasswordResetEmail(auth, email);
-    } catch (error: any) {
-      console.error('Failed to send password reset email');
-      console.error('Error code:', error.code);
-      console.error('Error message:', error.message);
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        const firebaseError = error as { code?: string; message?: string };
+        console.error('Failed to send password reset email');
+        console.error('Error code:', firebaseError.code);
+        console.error('Error message:', firebaseError.message);
+      }
       throw error;
     }
   }

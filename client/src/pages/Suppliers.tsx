@@ -61,8 +61,8 @@ export default function Suppliers() {
   const [orderStatusFilter, setOrderStatusFilter] = useState<'active' | 'finalised'>('active');
 
   useEffect(() => {
-    // Only admins and team owners can access this page
-    if (!userProfile?.isAdmin && userProfile?.isTeamMember) {
+    // Only admins and team members can access this page
+    if (!userProfile?.isAdmin && !userProfile?.isTeamMember) {
       navigate('/dashboard');
       return;
     }
@@ -90,7 +90,9 @@ export default function Suppliers() {
       })) as Supplier[];
       setSuppliers(suppliersData);
     } catch (error) {
-      console.error('Error fetching suppliers:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error fetching suppliers:', error);
+      }
     } finally {
       setLoadingSuppliers(false);
     }
@@ -108,7 +110,9 @@ export default function Suppliers() {
       })) as SupplierOrder[];
       setSupplierOrders(ordersData);
     } catch (error) {
-      console.error('Error fetching supplier orders:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error fetching supplier orders:', error);
+      }
     } finally {
       setLoadingOrders(false);
     }
@@ -185,8 +189,10 @@ export default function Suppliers() {
       await deleteDoc(supplierRef);
       await fetchSuppliers();
     } catch (error) {
-      console.error('Error deleting supplier:', error);
-      alert(t('suppliers.deleteError'));
+      if (import.meta.env.DEV) {
+        console.error('Error deleting supplier:', error);
+      }
+      showError(t('suppliers.deleteError'));
     } finally {
       setShowDeleteDialog(false);
       setSelectedSupplierId(null);
@@ -207,7 +213,9 @@ export default function Suppliers() {
       await fetchSupplierOrders();
       showSuccess(t('suppliers.deleteOrderSuccess'));
     } catch (error) {
-      console.error('Error deleting supplier order:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error deleting supplier order:', error);
+      }
       showError(t('suppliers.deleteOrderError'));
     } finally {
       setShowDeleteOrderDialog(false);
@@ -225,7 +233,9 @@ export default function Suppliers() {
       await fetchSupplierOrders();
       showSuccess(t('suppliers.finaliseOrderSuccess'));
     } catch (error) {
-      console.error('Error finalising supplier order:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error finalising supplier order:', error);
+      }
       showError(t('suppliers.finaliseOrderError'));
     }
   }

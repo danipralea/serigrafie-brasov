@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { collection, query, getDocs, addDoc, Timestamp } from 'firebase/firestore';
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/20/solid';
+import { showError } from '../services/notificationService';
 
 interface Client {
   id: string;
@@ -102,18 +103,20 @@ export default function ClientAutocomplete({ selectedClient, onSelectClient, err
 
   async function handleAddNewClient() {
     if (!currentUser) {
-      console.error('No user logged in');
-      alert(t('clients.addModal.errorFailed'));
+      if (import.meta.env.DEV) {
+        console.error('No user logged in');
+      }
+      showError(t('clients.addModal.errorFailed'));
       return;
     }
 
     if (!newClient.name.trim()) {
-      alert(t('clients.addModal.errorName'));
+      showError(t('clients.addModal.errorName'));
       return;
     }
 
     if (newClient.email && !newClient.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-      alert(t('clients.addModal.errorEmail'));
+      showError(t('clients.addModal.errorEmail'));
       return;
     }
 
@@ -156,8 +159,10 @@ export default function ClientAutocomplete({ selectedClient, onSelectClient, err
       setShowAddForm(false);
       setShowDropdown(false);
     } catch (error) {
-      console.error('Error adding client:', error);
-      alert(t('clients.addModal.errorFailed'));
+      if (import.meta.env.DEV) {
+        console.error('Error adding client:', error);
+      }
+      showError(t('clients.addModal.errorFailed'));
     } finally {
       setLoading(false);
     }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
@@ -39,110 +39,7 @@ export default function PlaceOrder() {
     }
   ]);
 
-  // Clear error when user authenticates and submit order if pending
-  useEffect(() => {
-    if (currentUser && pendingSubmit) {
-      setError('');
-      setPendingSubmit(false);
-      submitOrder();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser, pendingSubmit]);
-
-  // Pre-fill contact phone with user's phone number if available
-  useEffect(() => {
-    if (currentUser?.phoneNumber && !contactPhone) {
-      setContactPhone(currentUser.phoneNumber);
-    }
-  }, [currentUser, contactPhone]);
-
-  // Scroll to top when error is set
-  useEffect(() => {
-    if (error && scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  }, [error]);
-
-  function handleSubOrderChange(id: string, field: string, value: any) {
-    setSubOrders(prev =>
-      prev.map(so => (so.id === id ? { ...so, [field]: value } : so))
-    );
-  }
-
-  function handleAddSubOrder() {
-    setSubOrders(prev => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        productType: null,
-        quantity: '',
-        length: '',
-        width: '',
-        cmp: '',
-        description: '',
-        designFile: '',
-        deliveryTime: '',
-        notes: ''
-      }
-    ]);
-  }
-
-  function handleRemoveSubOrder(id: string) {
-    setSubOrders(prev => prev.filter(so => so.id !== id));
-  }
-
-  function validateForm(): boolean {
-    // Validate at least one sub-order
-    if (subOrders.length === 0) {
-      setError(t('order.errorAtLeastOneSubOrder'));
-      return false;
-    }
-
-    // Validate each sub-order
-    for (let i = 0; i < subOrders.length; i++) {
-      const so = subOrders[i];
-
-      if (!so.productType) {
-        setError(`${t('order.subOrderItem')} #${i + 1}: ${t('order.errorProductTypeRequired')}`);
-        return false;
-      }
-
-      if (!so.quantity || parseInt(so.quantity) <= 0) {
-        setError(`${t('order.subOrderItem')} #${i + 1}: ${t('order.errorQuantityRequired')}`);
-        return false;
-      }
-
-      if (!so.deliveryTime || !so.deliveryTime.trim()) {
-        setError(`${t('order.subOrderItem')} #${i + 1}: ${t('order.errorDeliveryTimeRequired')}`);
-        return false;
-      }
-    }
-
-    setError('');
-    return true;
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-
-    if (!validateForm()) return;
-
-    // Check if user is authenticated
-    if (!currentUser) {
-      setShowAuthModal(true);
-      setPendingSubmit(true);
-      return;
-    }
-
-    await submitOrder();
-  }
-
-  function handleAuthSuccess() {
-    setShowAuthModal(false);
-    setError('');
-  }
-
-  async function submitOrder() {
+  const submitOrder = useCallback(async () => {
     if (!currentUser) {
       setError('Please authenticate to submit order');
       return;
@@ -239,6 +136,108 @@ export default function PlaceOrder() {
     } finally {
       setLoading(false);
     }
+  }, [currentUser, userProfile, contactPhone, subOrders, t, navigate]);
+
+  // Clear error when user authenticates and submit order if pending
+  useEffect(() => {
+    if (currentUser && pendingSubmit) {
+      setError('');
+      setPendingSubmit(false);
+      submitOrder();
+    }
+  }, [currentUser, pendingSubmit, submitOrder]);
+
+  // Pre-fill contact phone with user's phone number if available
+  useEffect(() => {
+    if (currentUser?.phoneNumber && !contactPhone) {
+      setContactPhone(currentUser.phoneNumber);
+    }
+  }, [currentUser, contactPhone]);
+
+  // Scroll to top when error is set
+  useEffect(() => {
+    if (error && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [error]);
+
+  function handleSubOrderChange(id: string, field: string, value: any) {
+    setSubOrders(prev =>
+      prev.map(so => (so.id === id ? { ...so, [field]: value } : so))
+    );
+  }
+
+  function handleAddSubOrder() {
+    setSubOrders(prev => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        productType: null,
+        quantity: '',
+        length: '',
+        width: '',
+        cmp: '',
+        description: '',
+        designFile: '',
+        deliveryTime: '',
+        notes: ''
+      }
+    ]);
+  }
+
+  function handleRemoveSubOrder(id: string) {
+    setSubOrders(prev => prev.filter(so => so.id !== id));
+  }
+
+  function validateForm(): boolean {
+    // Validate at least one sub-order
+    if (subOrders.length === 0) {
+      setError(t('order.errorAtLeastOneSubOrder'));
+      return false;
+    }
+
+    // Validate each sub-order
+    for (let i = 0; i < subOrders.length; i++) {
+      const so = subOrders[i];
+
+      if (!so.productType) {
+        setError(`${t('order.subOrderItem')} #${i + 1}: ${t('order.errorProductTypeRequired')}`);
+        return false;
+      }
+
+      if (!so.quantity || parseInt(so.quantity) <= 0) {
+        setError(`${t('order.subOrderItem')} #${i + 1}: ${t('order.errorQuantityRequired')}`);
+        return false;
+      }
+
+      if (!so.deliveryTime || !so.deliveryTime.trim()) {
+        setError(`${t('order.subOrderItem')} #${i + 1}: ${t('order.errorDeliveryTimeRequired')}`);
+        return false;
+      }
+    }
+
+    setError('');
+    return true;
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (!validateForm()) return;
+
+    // Check if user is authenticated
+    if (!currentUser) {
+      setShowAuthModal(true);
+      setPendingSubmit(true);
+      return;
+    }
+
+    await submitOrder();
+  }
+
+  function handleAuthSuccess() {
+    setShowAuthModal(false);
+    setError('');
   }
 
   // If user is authenticated, use AppShell for consistent navigation
@@ -263,6 +262,7 @@ export default function PlaceOrder() {
                 {t('order.contactPhone')}
               </label>
               <input
+                data-testid="place-order-phone-input"
                 type="tel"
                 value={contactPhone}
                 onChange={(e) => setContactPhone(e.target.value)}
@@ -281,6 +281,7 @@ export default function PlaceOrder() {
                   {t('order.orderItems')}
                 </h3>
                 <button
+                  data-testid="place-order-add-suborder-button"
                   type="button"
                   onClick={handleAddSubOrder}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-md transition-colors"
@@ -292,20 +293,22 @@ export default function PlaceOrder() {
 
               <div className="space-y-4">
                 {subOrders.map((subOrder, index) => (
-                  <SubOrderItem
-                    key={subOrder.id}
-                    subOrder={subOrder}
-                    index={index}
-                    onChange={handleSubOrderChange}
-                    onRemove={handleRemoveSubOrder}
-                    canRemove={subOrders.length > 1}
-                  />
+                  <div key={subOrder.id} data-testid={`sub-order-item-${index}`}>
+                    <SubOrderItem
+                      subOrder={subOrder}
+                      index={index}
+                      onChange={handleSubOrderChange}
+                      onRemove={handleRemoveSubOrder}
+                      canRemove={subOrders.length > 1}
+                    />
+                  </div>
                 ))}
               </div>
             </div>
 
             <div className="mt-6 flex items-center justify-end gap-x-6">
               <button
+                data-testid="place-order-cancel-button"
                 type="button"
                 onClick={() => navigate('/dashboard')}
                 className="text-sm font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
@@ -313,6 +316,7 @@ export default function PlaceOrder() {
                 {t('placeOrder.cancel')}
               </button>
               <button
+                data-testid="place-order-submit-button"
                 type="submit"
                 disabled={loading}
                 className="inline-flex justify-center rounded-md bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-2 text-sm font-semibold text-white shadow-xs hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
@@ -356,6 +360,7 @@ export default function PlaceOrder() {
               {t('order.contactPhone')}
             </label>
             <input
+              data-testid="place-order-phone-input"
               type="tel"
               value={contactPhone}
               onChange={(e) => setContactPhone(e.target.value)}
@@ -374,6 +379,7 @@ export default function PlaceOrder() {
                 {t('order.orderItems')}
               </h3>
               <button
+                data-testid="place-order-add-suborder-button"
                 type="button"
                 onClick={handleAddSubOrder}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-md transition-colors"
@@ -385,20 +391,22 @@ export default function PlaceOrder() {
 
             <div className="space-y-4">
               {subOrders.map((subOrder, index) => (
-                <SubOrderItem
-                  key={subOrder.id}
-                  subOrder={subOrder}
-                  index={index}
-                  onChange={handleSubOrderChange}
-                  onRemove={handleRemoveSubOrder}
-                  canRemove={subOrders.length > 1}
-                />
+                <div key={subOrder.id} data-testid={`sub-order-item-${index}`}>
+                  <SubOrderItem
+                    subOrder={subOrder}
+                    index={index}
+                    onChange={handleSubOrderChange}
+                    onRemove={handleRemoveSubOrder}
+                    canRemove={subOrders.length > 1}
+                  />
+                </div>
               ))}
             </div>
           </div>
 
           <div className="mt-6 flex items-center justify-end gap-x-6">
             <button
+              data-testid="place-order-cancel-button"
               type="button"
               onClick={() => navigate('/')}
               className="text-sm font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
@@ -406,6 +414,7 @@ export default function PlaceOrder() {
               {t('placeOrder.cancel')}
             </button>
             <button
+              data-testid="place-order-submit-button"
               type="submit"
               disabled={loading}
               className="inline-flex justify-center rounded-md bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-2 text-sm font-semibold text-white shadow-xs hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"

@@ -120,8 +120,8 @@ export default function SupplierAutocomplete({ selectedSupplier, onSelectSupplie
       return;
     }
 
-    // Check permissions
-    if (!userProfile?.isAdmin && userProfile?.isTeamMember) {
+    // Check permissions - only admins and team members can add suppliers
+    if (!userProfile?.isAdmin && !userProfile?.isTeamMember) {
       showError(t('common.permissionDenied'));
       return;
     }
@@ -182,7 +182,7 @@ export default function SupplierAutocomplete({ selectedSupplier, onSelectSupplie
     }
   }
 
-  const canAddSupplier = userProfile?.isAdmin || !userProfile?.isTeamMember;
+  const canAddSupplier = userProfile?.isAdmin || userProfile?.isTeamMember;
 
   return (
     <div className="relative" ref={dropdownRef}>

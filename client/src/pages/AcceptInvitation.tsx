@@ -89,6 +89,7 @@ export default function AcceptInvitation() {
       const userDocRef = doc(db, 'users', userCredential.user.uid);
       await updateDoc(userDocRef, {
         isTeamMember: true,
+        teamOwnerId: invitation.invitedBy,
       });
 
       // Update invitation status
@@ -145,6 +146,7 @@ export default function AcceptInvitation() {
       const userDocRef = doc(db, 'users', userCredential.user.uid);
       await updateDoc(userDocRef, {
         isTeamMember: true,
+        teamOwnerId: invitation.invitedBy,
       });
 
       // Update invitation status
@@ -185,6 +187,7 @@ export default function AcceptInvitation() {
       const userDocRef = doc(db, 'users', currentUser.uid);
       await updateDoc(userDocRef, {
         isTeamMember: true,
+        teamOwnerId: invitation.invitedBy,
       });
 
       // Update invitation status

@@ -1,9 +1,9 @@
 import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
 import { getAuth, connectAuthEmulator } from "firebase/auth";
 import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 import { getStorage, connectStorageEmulator } from "firebase/storage";
+import type { Analytics } from "firebase/analytics";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBo3Jaw3VDogwmuZq8A2vbgnQ702C5xaT8",
@@ -34,6 +34,21 @@ if (import.meta.env.VITE_USE_EMULATORS === 'true') {
   connectStorageEmulator(storage, 'localhost', 9199);
 }
 
-export const analytics = getAnalytics(app);
+// Initialize Analytics only in browser environments
+// This prevents crashes in SSR, Vitest, and other non-browser contexts
+let analytics: Analytics | null = null;
+if (typeof window !== 'undefined') {
+  // Dynamically import analytics only in browser
+  import("firebase/analytics")
+    .then(({ getAnalytics }) => {
+      analytics = getAnalytics(app);
+    })
+    .catch((err) => {
+      if (import.meta.env.DEV) {
+        console.warn('Firebase Analytics not supported in this environment:', err);
+      }
+    });
+}
 
+export { analytics };
 export default app;

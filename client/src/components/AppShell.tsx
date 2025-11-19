@@ -134,7 +134,7 @@ export default function AppShell({ children, title }: { children: React.ReactNod
           { name: t('nav.clients'), href: '/clients', current: location.pathname === '/clients' },
         ]
       : []),
-    ...(userProfile?.isAdmin || !userProfile?.isTeamMember
+    ...(userProfile?.isAdmin || userProfile?.isTeamMember
       ? [
           { name: t('nav.suppliers'), href: '/suppliers', current: location.pathname === '/suppliers' },
         ]

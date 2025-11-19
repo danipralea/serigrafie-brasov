@@ -6,7 +6,7 @@ import { formatDate } from '../utils/dateUtils';
 
 export default function Notifications({ onNotificationClick }) {
   const { currentUser } = useAuth();
-  const [notifications, setNotifications] = useState([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
 

@@ -5,6 +5,7 @@ import { db } from '../firebase';
 import { collection, query, getDocs, addDoc, Timestamp } from 'firebase/firestore';
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/20/solid';
 import { ProductType } from '../types';
+import { showError } from '../services/notificationService';
 
 interface ProductTypeOption {
   id: string;
@@ -180,12 +181,12 @@ export default function ProductTypeAutocomplete({
 
   async function handleAddNewProductType() {
     if (!newProductType.name.trim()) {
-      alert(t('productType.errorName'));
+      showError(t('productType.errorName'));
       return;
     }
 
     if (!currentUser) {
-      alert(t('common.errorNotAuthenticated'));
+      showError(t('common.errorNotAuthenticated'));
       return;
     }
 
@@ -223,8 +224,10 @@ export default function ProductTypeAutocomplete({
       setShowAddForm(false);
       setShowDropdown(false);
     } catch (error) {
-      console.error('Error adding product type:', error);
-      alert(t('productType.errorFailed'));
+      if (import.meta.env.DEV) {
+        console.error('Error adding product type:', error);
+      }
+      showError(t('productType.errorFailed'));
     } finally {
       setLoading(false);
     }

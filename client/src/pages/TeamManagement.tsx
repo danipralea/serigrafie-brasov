@@ -3,21 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
-import { collection, query, where, getDocs, orderBy, doc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, doc, getDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { TeamRole, Department } from '../types';
 import InviteTeamModal from '../components/InviteTeamModal';
 import AddDepartmentModal from '../components/AddDepartmentModal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import AppShell from '../components/AppShell';
 import { formatDate } from '../utils/dateUtils';
+import { showError, showSuccess } from '../services/notificationService';
 
 export default function TeamManagement() {
   const { currentUser, userProfile } = useAuth();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'team' | 'departments'>('team');
-  const [teamMembers, setTeamMembers] = useState([]);
-  const [pendingInvitations, setPendingInvitations] = useState([]);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [pendingInvitations, setPendingInvitations] = useState<any[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -74,7 +75,9 @@ export default function TeamManagement() {
       });
       setTeamMembers(members);
     } catch (error) {
-      console.error('Error fetching team data:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error fetching team data:', error);
+      }
     } finally {
       setLoading(false);
     }
@@ -96,7 +99,9 @@ export default function TeamManagement() {
       } as Department));
       setDepartments(depts);
     } catch (error) {
-      console.error('Error fetching departments:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error fetching departments:', error);
+      }
     }
   }
 
@@ -112,8 +117,10 @@ export default function TeamManagement() {
       await deleteDoc(doc(db, 'departments', selectedDepartmentId));
       await fetchDepartments();
     } catch (error) {
-      console.error('Error deleting department:', error);
-      alert(t('departments.deleteFailed'));
+      if (import.meta.env.DEV) {
+        console.error('Error deleting department:', error);
+      }
+      showError(t('departments.deleteFailed'));
     } finally {
       setShowDeleteDepartmentDialog(false);
       setSelectedDepartmentId(null);
@@ -133,8 +140,10 @@ export default function TeamManagement() {
       await deleteDoc(invitationRef);
       await fetchTeamData();
     } catch (error) {
-      console.error('Error canceling invitation:', error);
-      alert(t('team.dialogs.cancelInvitationError'));
+      if (import.meta.env.DEV) {
+        console.error('Error canceling invitation:', error);
+      }
+      showError(t('team.dialogs.cancelInvitationError'));
     } finally {
       setShowCancelDialog(false);
       setSelectedInvitationId(null);
@@ -150,16 +159,39 @@ export default function TeamManagement() {
     if (!selectedMemberId) return;
 
     try {
-      // Update invitation status to removed
+      // Get the invitation document to find the user who accepted it
       const invitationRef = doc(db, 'teamInvitations', selectedMemberId);
+      const invitationSnap = await getDoc(invitationRef);
+
+      if (!invitationSnap.exists()) {
+        throw new Error('Invitation not found');
+      }
+
+      const invitationData = invitationSnap.data();
+      const acceptedByUserId = invitationData.acceptedBy;
+
+      // Update invitation status to removed
       await updateDoc(invitationRef, {
         status: 'removed',
         removedAt: new Date()
       });
+
+      // CRITICAL: Reset the user's team member permissions
+      if (acceptedByUserId) {
+        const userRef = doc(db, 'users', acceptedByUserId);
+        await updateDoc(userRef, {
+          isTeamMember: false,
+          isAdmin: false,
+          teamOwnerId: null
+        });
+      }
+
       await fetchTeamData();
     } catch (error) {
-      console.error('Error removing member:', error);
-      alert(t('team.dialogs.removeMemberError'));
+      if (import.meta.env.DEV) {
+        console.error('Error removing member:', error);
+      }
+      showError(t('team.dialogs.removeMemberError'));
     } finally {
       setShowRemoveDialog(false);
       setSelectedMemberId(null);

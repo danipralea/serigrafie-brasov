@@ -2,13 +2,28 @@ import { storage } from '../firebase';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 
 /**
- * Upload a file to Firebase Storage
- * @param {File} file - The file to upload
- * @param {string} folder - The folder path in storage (e.g., 'designs', 'updates')
- * @param {string} userId - The user ID for organizing files
- * @returns {Promise<{url: string, path: string}>} - Download URL and storage path
+ * Result returned from file upload operations
  */
-export async function uploadFile(file, folder, userId) {
+export interface UploadResult {
+  url: string;
+  path: string;
+  name: string;
+  size: number;
+  type: string;
+}
+
+/**
+ * Upload a file to Firebase Storage
+ * @param file - The file to upload
+ * @param folder - The folder path in storage (e.g., 'designs', 'updates')
+ * @param userId - The user ID for organizing files
+ * @returns Download URL and storage path information
+ */
+export async function uploadFile(
+  file: File,
+  folder: string,
+  userId: string
+): Promise<UploadResult> {
   if (!file) {
     throw new Error('No file provided');
   }
@@ -36,16 +51,18 @@ export async function uploadFile(file, folder, userId) {
       type: file.type
     };
   } catch (error) {
-    console.error('Error uploading file:', error);
+    if (import.meta.env.DEV) {
+      console.error('Error uploading file:', error);
+    }
     throw new Error('Failed to upload file');
   }
 }
 
 /**
  * Delete a file from Firebase Storage
- * @param {string} storagePath - The path of the file in storage
+ * @param storagePath - The path of the file in storage
  */
-export async function deleteFile(storagePath) {
+export async function deleteFile(storagePath: string): Promise<void> {
   if (!storagePath) {
     throw new Error('No storage path provided');
   }
@@ -55,19 +72,25 @@ export async function deleteFile(storagePath) {
   try {
     await deleteObject(storageRef);
   } catch (error) {
-    console.error('Error deleting file:', error);
+    if (import.meta.env.DEV) {
+      console.error('Error deleting file:', error);
+    }
     throw new Error('Failed to delete file');
   }
 }
 
 /**
  * Upload multiple files
- * @param {File[]} files - Array of files to upload
- * @param {string} folder - The folder path in storage
- * @param {string} userId - The user ID for organizing files
- * @returns {Promise<Array>} - Array of upload results
+ * @param files - Array of files to upload
+ * @param folder - The folder path in storage
+ * @param userId - The user ID for organizing files
+ * @returns Array of upload results
  */
-export async function uploadMultipleFiles(files, folder, userId) {
+export async function uploadMultipleFiles(
+  files: File[],
+  folder: string,
+  userId: string
+): Promise<UploadResult[]> {
   const uploadPromises = files.map(file => uploadFile(file, folder, userId));
   return Promise.all(uploadPromises);
 }

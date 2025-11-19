@@ -1,3 +1,5 @@
+import { Timestamp } from 'firebase/firestore';
+
 // Order related types
 export const OrderStatus = {
   PENDING_CONFIRMATION: 'pending_confirmation',
@@ -5,7 +7,9 @@ export const OrderStatus = {
   IN_PROGRESS: 'in_progress',
   COMPLETED: 'completed',
   CANCELLED: 'cancelled'
-};
+} as const;
+
+export type OrderStatusType = typeof OrderStatus[keyof typeof OrderStatus];
 
 export const ProductType = {
   MUGS: 'mugs',
@@ -14,21 +18,27 @@ export const ProductType = {
   BAGS: 'bags',
   CAPS: 'caps',
   OTHER: 'other'
-};
+} as const;
+
+export type ProductTypeType = typeof ProductType[keyof typeof ProductType];
 
 // Team related types
 export const TeamRole = {
   OWNER: 'owner',
   ADMIN: 'admin',
   MEMBER: 'member'
-};
+} as const;
+
+export type TeamRoleType = typeof TeamRole[keyof typeof TeamRole];
 
 export const InvitationStatus = {
   PENDING: 'pending',
   ACCEPTED: 'accepted',
   DECLINED: 'declined',
   EXPIRED: 'expired'
-};
+} as const;
+
+export type InvitationStatusType = typeof InvitationStatus[keyof typeof InvitationStatus];
 
 // Supplier related types
 export interface ContactPerson {
@@ -43,8 +53,8 @@ export interface Supplier {
   email: string;
   phone: string;
   contactPerson?: ContactPerson;
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
 }
 
 export interface SupplierOrderItem {
@@ -66,8 +76,8 @@ export interface SupplierOrder {
   supplierName: string;
   items: SupplierOrderItem[];
   status: string;
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
   createdBy?: string;
 }
 
@@ -77,7 +87,7 @@ export interface Department {
   name: string;
   managerId: string; // Team member responsible for managing this department
   managerName?: string; // For display purposes
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
   createdBy?: string;
 }

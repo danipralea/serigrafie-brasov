@@ -68,7 +68,9 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
 
       setOrderUpdates(updates);
     } catch (error) {
-      console.error('Error fetching order updates:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error fetching order updates:', error);
+      }
       setOrderUpdates([]);
     }
   }
@@ -105,8 +107,10 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
           attachmentName = result.name;
           attachmentType = result.type;
         } catch (uploadError) {
-          console.error('Error uploading attachment:', uploadError);
-          alert(t('dashboard.orderModal.attachmentUploadFailed'));
+          if (import.meta.env.DEV) {
+            console.error('Error uploading attachment:', uploadError);
+          }
+          showError(t('dashboard.orderModal.attachmentUploadFailed'));
         } finally {
           setUploadingAttachment(false);
         }
@@ -135,8 +139,10 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
       setUpdateText('');
       setAttachmentFile(null);
     } catch (error) {
-      console.error('Error posting update:', error);
-      alert(`Failed to post update: ${(error as any).message || 'Unknown error'}`);
+      if (import.meta.env.DEV) {
+        console.error('Error posting update:', error);
+      }
+      showError(`Failed to post update: ${(error as any).message || 'Unknown error'}`);
     } finally {
       setPostingUpdate(false);
       setUploadingAttachment(false);
@@ -181,8 +187,10 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
       setSelectedOrder({ ...selectedOrder, status: newStatus });
       if (onOrderUpdated) onOrderUpdated();
     } catch (error) {
-      console.error('Error updating order status:', error);
-      alert('Failed to update order status');
+      if (import.meta.env.DEV) {
+        console.error('Error updating order status:', error);
+      }
+      showError('Failed to update order status');
     }
   }
 
@@ -218,7 +226,9 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
       if (onOrderUpdated) onOrderUpdated();
       showSuccess(t('order.subOrderStatusUpdated'));
     } catch (error) {
-      console.error('Error updating sub-order status:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error updating sub-order status:', error);
+      }
       showError(t('order.errorUpdatingSubOrderStatus'));
     }
   }
@@ -261,8 +271,10 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
       setSelectedOrder({ ...selectedOrder, status: OrderStatus.PENDING, confirmedByClient: true });
       if (onOrderUpdated) onOrderUpdated();
     } catch (error) {
-      console.error('Error confirming order:', error);
-      alert('Eroare la confirmarea comenzii');
+      if (import.meta.env.DEV) {
+        console.error('Error confirming order:', error);
+      }
+      showError('Eroare la confirmarea comenzii');
     }
   }
 
@@ -292,7 +304,9 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
       showSuccess(t('dashboard.orderModal.orderDeleted'));
       if (onOrderUpdated) onOrderUpdated();
     } catch (error: any) {
-      console.error('Error deleting order:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error deleting order:', error);
+      }
       let errorMessage = t('dashboard.orderModal.deleteError');
       if (error?.code === 'permission-denied') {
         errorMessage = t('dashboard.orderModal.deletePermissionError');
@@ -313,8 +327,10 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
         await fetchOrderUpdates(selectedOrder.id);
       }
     } catch (error) {
-      console.error('Error deleting update:', error);
-      alert('Eroare la ștergerea actualizării');
+      if (import.meta.env.DEV) {
+        console.error('Error deleting update:', error);
+      }
+      showError('Eroare la ștergerea actualizării');
     } finally {
       setShowDeleteUpdateDialog(false);
       setSelectedUpdateId(null);
@@ -339,8 +355,10 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
         amount: undefined
       });
     } catch (error) {
-      console.error('Error downloading invoice:', error);
-      alert(t('dashboard.orderModal.downloadInvoiceError'));
+      if (import.meta.env.DEV) {
+        console.error('Error downloading invoice:', error);
+      }
+      showError(t('dashboard.orderModal.downloadInvoiceError'));
     }
   }
 
@@ -362,10 +380,12 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
         completedAt: selectedOrder.updatedAt?.toDate(),
         amount: undefined
       });
-      alert(t('dashboard.orderModal.invoiceSent'));
+      showSuccess(t('dashboard.orderModal.invoiceSent'));
     } catch (error) {
-      console.error('Error sending invoice:', error);
-      alert(t('dashboard.orderModal.sendInvoiceError'));
+      if (import.meta.env.DEV) {
+        console.error('Error sending invoice:', error);
+      }
+      showError(t('dashboard.orderModal.sendInvoiceError'));
     } finally {
       setSendingInvoice(false);
     }
@@ -396,6 +416,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
   return (
     <>
       <div
+        data-testid="order-details-modal"
         className="fixed inset-0 bg-slate-900/75 dark:bg-black/80 flex items-center justify-center z-50 p-4 transition-colors"
         onClick={onClose}
       >
@@ -427,6 +448,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
             <div className="flex items-center gap-2">
               {(userProfile?.isAdmin || userProfile?.isTeamMember) && (
                 <button
+                  data-testid="delete-order-button"
                   onClick={() => setShowDeleteDialog(true)}
                   className="text-red-600 dark:text-red-500 hover:text-red-800 dark:hover:text-red-400 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
                   title={t('dashboard.orderModal.deleteOrder')}
@@ -653,6 +675,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                       {t('dashboard.orderModal.confirmationDesc')}
                     </p>
                     <button
+                      data-testid="order-confirm-button"
                       onClick={confirmOrder}
                       className="px-4 py-2 bg-gradient-to-r from-blue-600 to-cyan-500 text-white rounded-lg hover:opacity-90 font-medium transition-opacity"
                     >
@@ -671,6 +694,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                   {Object.values(OrderStatus).map((status) => (
                     <button
                       key={status}
+                      data-testid={`order-status-button-${status}`}
                       onClick={() => updateOrderStatus(status)}
                       disabled={selectedOrder.status === status || status === OrderStatus.PENDING_CONFIRMATION}
                       className={`px-3 py-1 text-sm rounded-lg transition-colors ${
@@ -691,7 +715,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
               <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{t('dashboard.orderModal.updatesComments')}</h4>
 
               {/* Updates List */}
-              <div className="bg-gray-50 dark:bg-slate-700 rounded-lg p-4 mb-4 max-h-96 overflow-y-auto">
+              <div data-testid="order-updates-list" className="bg-gray-50 dark:bg-slate-700 rounded-lg p-4 mb-4 max-h-96 overflow-y-auto">
                 {orderUpdates.length === 0 ? (
                   <p className="text-sm text-gray-500 dark:text-slate-400 text-center py-8">
                     {t('dashboard.orderModal.noUpdates')}
@@ -714,6 +738,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                       return (
                         <div
                           key={update.id}
+                          data-testid={`order-update-item-${update.id}`}
                           className={`flex gap-2 ${isClientMessage ? 'justify-end' : 'justify-start'} group`}
                         >
                           {!isSystemMessage && !isClientMessage && (
@@ -857,6 +882,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
               {/* Post Update Form */}
               <div className="space-y-2">
                 <textarea
+                  data-testid="order-update-message-input"
                   value={updateText}
                   onChange={(e) => setUpdateText(e.target.value)}
                   placeholder={t('dashboard.orderModal.addComment')}
@@ -884,13 +910,14 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                 <div className="flex flex-col sm:flex-row gap-2 sm:justify-between sm:items-center">
                   <div className="w-full sm:w-auto">
                     <input
+                      data-testid="order-update-file-input"
                       ref={attachmentInputRef}
                       type="file"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) {
                           if (file.size > 10 * 1024 * 1024) {
-                            alert(t('dashboard.orderModal.fileSizeError'));
+                            showError(t('dashboard.orderModal.fileSizeError'));
                             return;
                           }
                           setAttachmentFile(file);
@@ -912,6 +939,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                   </div>
 
                   <button
+                    data-testid="order-update-submit-button"
                     onClick={postUpdate}
                     disabled={postingUpdate || (!updateText.trim() && !attachmentFile)}
                     className="w-full sm:w-auto px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"

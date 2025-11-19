@@ -10,13 +10,14 @@ import EditClientModal from '../components/EditClientModal';
 import InviteClientModal from '../components/InviteClientModal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { formatDate } from '../utils/dateUtils';
+import { showError, showSuccess } from '../services/notificationService';
 
 export default function Clients() {
   const { currentUser, userProfile } = useAuth();
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const [clients, setClients] = useState([]);
-  const [filteredClients, setFilteredClients] = useState([]);
+  const [clients, setClients] = useState<any[]>([]);
+  const [filteredClients, setFilteredClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -52,7 +53,9 @@ export default function Clients() {
       }));
       setClients(clientsData);
     } catch (error) {
-      console.error('Error fetching clients:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error fetching clients:', error);
+      }
     } finally {
       setLoading(false);
     }
@@ -111,8 +114,10 @@ export default function Clients() {
       await deleteDoc(clientRef);
       await fetchClients();
     } catch (error) {
-      console.error('Error deleting client:', error);
-      alert(t('clients.deleteError'));
+      if (import.meta.env.DEV) {
+        console.error('Error deleting client:', error);
+      }
+      showError(t('clients.deleteError'));
     } finally {
       setShowDeleteDialog(false);
       setSelectedClientId(null);

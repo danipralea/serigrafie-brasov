@@ -349,6 +349,7 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
             </DialogTitle>
             <div className="flex items-center gap-3">
               <button
+                data-testid="admin-place-order-submit-button"
                 type="submit"
                 form="order-form"
                 disabled={loading}
@@ -382,6 +383,7 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
                   {t('order.orderName')} *
                 </label>
                 <input
+                  data-testid="admin-place-order-name-input"
                   type="text"
                   value={orderName}
                   onChange={(e) => setOrderName(e.target.value)}
@@ -450,6 +452,7 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
                       {t('order.contactPhone')} {t('common.optional')}
                     </label>
                     <input
+                      data-testid="admin-place-order-phone-input"
                       type="tel"
                       value={contactPhone}
                       onChange={(e) => setContactPhone(e.target.value)}
@@ -471,6 +474,7 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
                   {t('order.contactPhone')}
                 </h3>
                 <input
+                  data-testid="admin-place-order-phone-input"
                   type="tel"
                   value={contactPhone}
                   onChange={(e) => setContactPhone(e.target.value)}
@@ -490,6 +494,7 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
                   {t('order.orderItems')}
                 </h3>
                 <button
+                  data-testid="admin-place-order-add-suborder-button"
                   type="button"
                   onClick={handleAddSubOrder}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-md transition-colors"
@@ -501,15 +506,16 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
 
               <div className="space-y-4">
                 {subOrders.map((subOrder, index) => (
-                  <SubOrderItem
-                    key={subOrder.id}
-                    subOrder={subOrder}
-                    index={index}
-                    onChange={handleSubOrderChange}
-                    onRemove={handleRemoveSubOrder}
-                    canRemove={subOrders.length > 1}
-                    departments={departments}
-                  />
+                  <div key={subOrder.id} data-testid={`admin-sub-order-item-${index}`}>
+                    <SubOrderItem
+                      subOrder={subOrder}
+                      index={index}
+                      onChange={handleSubOrderChange}
+                      onRemove={handleRemoveSubOrder}
+                      canRemove={subOrders.length > 1}
+                      departments={departments}
+                    />
+                  </div>
                 ))}
               </div>
             </div>

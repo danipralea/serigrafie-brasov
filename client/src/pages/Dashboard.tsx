@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
@@ -21,8 +21,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useTranslation();
-  const [orders, setOrders] = useState([]);
-  const [filteredOrders, setFilteredOrders] = useState([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showPlaceOrderModal, setShowPlaceOrderModal] = useState(false);
@@ -31,7 +30,7 @@ export default function Dashboard() {
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [updateText, setUpdateText] = useState('');
   const [postingUpdate, setPostingUpdate] = useState(false);
-  const [orderUpdates, setOrderUpdates] = useState([]);
+  const [orderUpdates, setOrderUpdates] = useState<any[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [attachmentFile, setAttachmentFile] = useState(null);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
@@ -49,7 +48,7 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Helper function to get earliest delivery time from sub-orders
-  function getEarliestDeliveryTime(subOrders) {
+  const getEarliestDeliveryTime = useCallback((subOrders) => {
     if (!subOrders || subOrders.length === 0) return null;
 
     const times = subOrders
@@ -61,7 +60,44 @@ export default function Dashboard() {
     return times.reduce((earliest, current) => {
       return new Date(current) < new Date(earliest) ? current : earliest;
     });
-  }
+  }, []);
+
+  const fetchOrderUpdates = useCallback(async (orderId) => {
+    try {
+      const updatesRef = collection(db, 'orderUpdates');
+      const q = query(
+        updatesRef,
+        where('orderId', '==', orderId)
+      );
+      const snapshot = await getDocs(q);
+      const updates = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      // Sort in memory instead of using Firestore orderBy to avoid index requirement
+      updates.sort((a, b) => {
+        const timeA = a.createdAt?.toMillis() || 0;
+        const timeB = b.createdAt?.toMillis() || 0;
+        return timeA - timeB; // asc order (oldest first, like a chat conversation)
+      });
+
+      setOrderUpdates(updates);
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.error('Error fetching order updates:', error);
+      }
+      showError(`Error fetching updates: ${(error as any).message}`);
+      // Set empty array on error so UI still works
+      setOrderUpdates([]);
+    }
+  }, []);
+
+  const openOrderDetails = useCallback(async (order) => {
+    setSelectedOrder(order);
+    setShowOrderModal(true);
+    await fetchOrderUpdates(order.id);
+  }, [fetchOrderUpdates]);
 
   useEffect(() => {
     if (!currentUser || !userProfile) return;
@@ -108,7 +144,9 @@ export default function Dashboard() {
               subOrders: subOrders || []
             };
           } catch (error) {
-            console.error(`Error fetching sub-orders for order ${orderDoc.id}:`, error);
+            if (import.meta.env.DEV) {
+              console.error(`Error fetching sub-orders for order ${orderDoc.id}:`, error);
+            }
             return {
               ...orderData,
               subOrders: []
@@ -129,17 +167,14 @@ export default function Dashboard() {
       setOrders(ordersWithSubOrders);
       setLoading(false);
     }, (error) => {
-      console.error('Error fetching orders:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error fetching orders:', error);
+      }
       setLoading(false);
     });
 
     return () => unsubscribe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser, userProfile]);
-
-  useEffect(() => {
-    applyFiltersAndSort();
-  }, [orders, activeTab, statusFilter, productFilter, sortBy, searchQuery]);
 
   // Check if we need to open a specific order from notification
   useEffect(() => {
@@ -151,8 +186,7 @@ export default function Dashboard() {
         navigate(location.pathname, { replace: true, state: {} });
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.state, orders]);
+  }, [location.state, orders, openOrderDetails, navigate, location.pathname]);
 
   // Handle Escape key to close order details modal
   useEffect(() => {
@@ -175,8 +209,8 @@ export default function Dashboard() {
     }
   }, [orderUpdates]);
 
-
-  function applyFiltersAndSort() {
+  // Use useMemo to calculate filtered orders - eliminates unnecessary state and useEffect
+  const filteredOrders = useMemo(() => {
     let filtered = [...orders];
 
     // Apply tab filter - separate current and past orders
@@ -288,49 +322,13 @@ export default function Dashboard() {
         break;
     }
 
-    setFilteredOrders(filtered);
-  }
-
-
-  async function openOrderDetails(order) {
-    setSelectedOrder(order);
-    setShowOrderModal(true);
-    await fetchOrderUpdates(order.id);
-  }
+    return filtered;
+  }, [orders, activeTab, statusFilter, productFilter, sortBy, searchQuery, getEarliestDeliveryTime]);
 
   function handleReorder(e, order) {
     e.stopPropagation(); // Prevent row click from opening order details
     setInitialOrderData(order);
     setShowPlaceOrderModal(true);
-  }
-
-  async function fetchOrderUpdates(orderId) {
-    try {
-      const updatesRef = collection(db, 'orderUpdates');
-      const q = query(
-        updatesRef,
-        where('orderId', '==', orderId)
-      );
-      const snapshot = await getDocs(q);
-      const updates = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-
-      // Sort in memory instead of using Firestore orderBy to avoid index requirement
-      updates.sort((a, b) => {
-        const timeA = a.createdAt?.toMillis() || 0;
-        const timeB = b.createdAt?.toMillis() || 0;
-        return timeA - timeB; // asc order (oldest first, like a chat conversation)
-      });
-
-      setOrderUpdates(updates);
-    } catch (error) {
-      console.error('Error fetching order updates:', error);
-      alert(`Error fetching updates: ${error.message}`);
-      // Set empty array on error so UI still works
-      setOrderUpdates([]);
-    }
   }
 
   function getInitials(name, email) {
@@ -367,8 +365,10 @@ export default function Dashboard() {
           attachmentName = result.name;
           attachmentType = result.type;
         } catch (uploadError) {
-          console.error('Error uploading attachment:', uploadError);
-          alert(t('dashboard.orderModal.attachmentUploadFailed'));
+          if (import.meta.env.DEV) {
+            console.error('Error uploading attachment:', uploadError);
+          }
+          showError(t('dashboard.orderModal.attachmentUploadFailed'));
         } finally {
           setUploadingAttachment(false);
         }
@@ -400,8 +400,10 @@ export default function Dashboard() {
       setUpdateText('');
       setAttachmentFile(null);
     } catch (error) {
-      console.error('Error posting update:', error);
-      alert(`Failed to post update: ${error.message || 'Unknown error'}`);
+      if (import.meta.env.DEV) {
+        console.error('Error posting update:', error);
+      }
+      showError(`Failed to post update: ${(error as any).message || 'Unknown error'}`);
     } finally {
       setPostingUpdate(false);
       setUploadingAttachment(false);
@@ -434,8 +436,10 @@ export default function Dashboard() {
       await fetchOrderUpdates(selectedOrder.id);
       setSelectedOrder({ ...selectedOrder, status: newStatus });
     } catch (error) {
-      console.error('Error updating order status:', error);
-      alert('Failed to update order status');
+      if (import.meta.env.DEV) {
+        console.error('Error updating order status:', error);
+      }
+      showError('Failed to update order status');
     }
   }
 
@@ -479,8 +483,10 @@ export default function Dashboard() {
       await fetchOrderUpdates(selectedOrder.id);
       setSelectedOrder({ ...selectedOrder, status: OrderStatus.PENDING, confirmedByClient: true });
     } catch (error) {
-      console.error('Error confirming order:', error);
-      alert('Eroare la confirmarea comenzii');
+      if (import.meta.env.DEV) {
+        console.error('Error confirming order:', error);
+      }
+      showError('Eroare la confirmarea comenzii');
     }
   }
 
@@ -546,8 +552,10 @@ export default function Dashboard() {
         await fetchOrderUpdates(selectedOrder.id);
       }
     } catch (error) {
-      console.error('Error deleting update:', error);
-      alert('Eroare la ștergerea actualizării');
+      if (import.meta.env.DEV) {
+        console.error('Error deleting update:', error);
+      }
+      showError('Eroare la ștergerea actualizării');
     } finally {
       setShowDeleteUpdateDialog(false);
       setSelectedUpdateId(null);
@@ -572,8 +580,10 @@ export default function Dashboard() {
         amount: undefined // You can add pricing logic here
       });
     } catch (error) {
-      console.error('Error downloading invoice:', error);
-      alert(t('dashboard.orderModal.downloadInvoiceError'));
+      if (import.meta.env.DEV) {
+        console.error('Error downloading invoice:', error);
+      }
+      showError(t('dashboard.orderModal.downloadInvoiceError'));
     }
   }
 
@@ -595,10 +605,12 @@ export default function Dashboard() {
         completedAt: selectedOrder.updatedAt?.toDate(),
         amount: undefined // You can add pricing logic here
       });
-      alert(t('dashboard.orderModal.invoiceSentSuccess'));
+      showSuccess(t('dashboard.orderModal.invoiceSentSuccess'));
     } catch (error) {
-      console.error('Error sending invoice:', error);
-      alert(t('dashboard.orderModal.sendInvoiceError'));
+      if (import.meta.env.DEV) {
+        console.error('Error sending invoice:', error);
+      }
+      showError(t('dashboard.orderModal.sendInvoiceError'));
     } finally {
       setSendingInvoice(false);
     }
@@ -713,6 +725,7 @@ export default function Dashboard() {
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{t('dashboard.filters.status')}</label>
               <select
+                data-testid="status-filter-dropdown"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="w-full h-10 px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
@@ -768,6 +781,7 @@ export default function Dashboard() {
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 transition-colors mb-6">
           <div className="flex border-b border-slate-200 dark:border-slate-700">
             <button
+              data-testid="tab-past-orders"
               onClick={() => setActiveTab('past')}
               className={`flex-1 px-6 py-4 text-sm font-medium transition-colors relative ${
                 activeTab === 'past'
@@ -781,6 +795,7 @@ export default function Dashboard() {
               )}
             </button>
             <button
+              data-testid="tab-current-orders"
               onClick={() => setActiveTab('current')}
               className={`flex-1 px-6 py-4 text-sm font-medium transition-colors relative ${
                 activeTab === 'current'
@@ -803,6 +818,7 @@ export default function Dashboard() {
               {t(userProfile?.isAdmin || userProfile?.isTeamMember ? 'dashboard.table.orders' : 'dashboard.table.yourOrders')} ({filteredOrders.length})
             </h2>
             <button
+              data-testid="dashboard-add-order-button"
               onClick={() => setShowPlaceOrderModal(true)}
               title={t('dashboard.addOrderTitle')}
               className="px-3 sm:px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-medium transition-opacity hover:opacity-90 flex items-center gap-2 focus:outline-none shrink-0"
@@ -852,7 +868,7 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700 table-fixed">
+              <table data-testid="dashboard-orders-table" className="min-w-full divide-y divide-slate-200 dark:divide-slate-700 table-fixed">
                 <thead className="bg-slate-50 dark:bg-slate-800/50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
@@ -889,6 +905,7 @@ export default function Dashboard() {
                     return (
                       <tr
                         key={order.id}
+                        data-testid={`order-row-${order.id}`}
                         onClick={() => openOrderDetails(order)}
                         className="hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors"
                       >
@@ -932,6 +949,7 @@ export default function Dashboard() {
                         {activeTab === 'past' && !userProfile?.isAdmin && !userProfile?.isTeamMember && (
                           <td className="px-6 py-4 whitespace-nowrap text-sm" onClick={(e) => e.stopPropagation()}>
                             <button
+                              data-testid={`order-reorder-button-${order.id}`}
                               onClick={(e) => handleReorder(e, order)}
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors focus:outline-none"
                             >

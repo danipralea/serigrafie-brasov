@@ -203,6 +203,7 @@ export default function Login() {
               </label>
               <div className="mt-2">
                 <input
+                  data-testid="login-email-input"
                   id="email"
                   name="email"
                   type="email"
@@ -221,6 +222,7 @@ export default function Login() {
               </label>
               <div className="mt-2">
                 <input
+                  data-testid="login-password-input"
                   id="password"
                   name="password"
                   type="password"
@@ -281,6 +283,7 @@ export default function Login() {
 
             <div>
               <button
+                data-testid="login-submit-button"
                 type="submit"
                 disabled={loading}
                 className="flex w-full justify-center rounded-md px-3 py-1.5 text-sm/6 font-semibold text-white bg-gradient-to-r from-blue-600 to-cyan-500 shadow-xs hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -299,6 +302,7 @@ export default function Login() {
 
             <div className="mt-6 grid grid-cols-2 gap-4">
               <button
+                data-testid="login-google-button"
                 onClick={handleGoogleLogin}
                 disabled={loading}
                 className="flex w-full items-center justify-center gap-3 rounded-md bg-white dark:bg-slate-700 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-white shadow-xs ring-1 ring-inset ring-gray-300 dark:ring-slate-600 hover:bg-gray-50 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -360,6 +364,7 @@ export default function Login() {
           <p className="mt-10 text-center text-sm/6 text-gray-500 dark:text-slate-400">
             {t('login.notAMember')}{' '}
             <a
+              data-testid="signup-link"
               onClick={() => navigate('/place-order')}
               className="font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 cursor-pointer"
             >
