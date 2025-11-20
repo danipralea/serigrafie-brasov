@@ -10,25 +10,10 @@ interface NavigationProps {
   onInviteTeam?: () => void;
 }
 
-// Cache-bust: 2025-11-20-14-40
 export default function Navigation({ variant = 'landing', onInviteTeam }: NavigationProps) {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const { currentUser, userProfile, logout } = useAuth();
-
-  // Debug: Log user profile to console
-  console.error('🔍 ROLE DEBUG:', {
-    email: currentUser?.email,
-    role: userProfile?.role,
-    hasTeamAccess: hasTeamAccess(userProfile),
-    hasAdminAccess: hasAdminAccess(userProfile)
-  });
-
-  // Show alert once
-  if (userProfile && !window.roleAlertShown) {
-    window.roleAlertShown = true;
-    alert(`Your role: ${userProfile.role}\nhasTeamAccess: ${hasTeamAccess(userProfile)}\nhasAdminAccess: ${hasAdminAccess(userProfile)}`);
-  }
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>(() => {
     const saved = localStorage.getItem('themeMode');
     return (saved as 'light' | 'dark' | 'system') || 'system';
@@ -115,7 +100,6 @@ export default function Navigation({ variant = 'landing', onInviteTeam }: Naviga
             >
               {t('landing.title')}
             </h1>
-            <div className="text-xs text-red-500 font-mono">ROLE: {userProfile?.role || 'null'} | hasAdmin: {String(hasAdminAccess(userProfile))} | hasTeam: {String(hasTeamAccess(userProfile))}</div>
           </div>
 
           <div className="flex items-center gap-3">

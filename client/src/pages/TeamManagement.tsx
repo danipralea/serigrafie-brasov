@@ -17,7 +17,9 @@ export default function TeamManagement() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'team' | 'departments'>('team');
-  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [owners, setOwners] = useState<any[]>([]);
+  const [admins, setAdmins] = useState<any[]>([]);
+  const [members, setMembers] = useState<any[]>([]);
   const [pendingInvitations, setPendingInvitations] = useState<any[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,22 +60,30 @@ export default function TeamManagement() {
       });
       setPendingInvitations(invitations);
 
-      // Fetch accepted team members (you would need a teamMembers collection for this)
-      // For now, we'll show accepted invitations as team members
-      const acceptedQuery = query(
-        invitationsRef,
-        where('invitedBy', '==', currentUser.uid),
-        where('status', '==', 'accepted')
-      );
-      const acceptedSnapshot = await getDocs(acceptedQuery);
-      const members = acceptedSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })).sort((a, b) => {
-        // Sort by acceptedAt desc manually
-        return b.acceptedAt?.toMillis() - a.acceptedAt?.toMillis();
+      // Fetch all users from the users collection and categorize by role
+      const usersRef = collection(db, 'users');
+      const usersSnapshot = await getDocs(usersRef);
+
+      const ownersList: any[] = [];
+      const adminsList: any[] = [];
+      const membersList: any[] = [];
+
+      usersSnapshot.docs.forEach(doc => {
+        const userData = { id: doc.id, ...doc.data() };
+        const role = userData.role;
+
+        if (role === TeamRole.OWNER) {
+          ownersList.push(userData);
+        } else if (role === TeamRole.ADMIN) {
+          adminsList.push(userData);
+        } else if (role === TeamRole.MEMBER) {
+          membersList.push(userData);
+        }
       });
-      setTeamMembers(members);
+
+      setOwners(ownersList);
+      setAdmins(adminsList);
+      setMembers(membersList);
     } catch (error) {
       if (import.meta.env.DEV) {
         console.error('Error fetching team data:', error);
@@ -159,33 +169,15 @@ export default function TeamManagement() {
     if (!selectedMemberId) return;
 
     try {
-      // Get the invitation document to find the user who accepted it
-      const invitationRef = doc(db, 'teamInvitations', selectedMemberId);
-      const invitationSnap = await getDoc(invitationRef);
-
-      if (!invitationSnap.exists()) {
-        throw new Error('Invitation not found');
-      }
-
-      const invitationData = invitationSnap.data();
-      const acceptedByUserId = invitationData.acceptedBy;
-
-      // Update invitation status to removed
-      await updateDoc(invitationRef, {
-        status: 'removed',
-        removedAt: new Date()
+      // Update the user's role to regular user
+      const userRef = doc(db, 'users', selectedMemberId);
+      await updateDoc(userRef, {
+        role: 'user',
+        teamOwnerId: null
       });
 
-      // CRITICAL: Reset the user's role to regular user
-      if (acceptedByUserId) {
-        const userRef = doc(db, 'users', acceptedByUserId);
-        await updateDoc(userRef, {
-          role: 'user',
-          teamOwnerId: null
-        });
-      }
-
       await fetchTeamData();
+      showSuccess(t('team.memberRemoved') || 'Member removed successfully');
     } catch (error) {
       if (import.meta.env.DEV) {
         console.error('Error removing member:', error);
@@ -277,26 +269,91 @@ export default function TeamManagement() {
             {/* Team Tab */}
             {activeTab === 'team' && (
               <div className="space-y-6">
-            {/* Team Owner Card */}
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-6 transition-colors">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('team.teamOwner')}</h3>
-              <div className="flex items-center justify-between p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-100 dark:border-purple-800">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-full bg-purple-200 dark:bg-purple-700 flex items-center justify-center">
-                    <svg className="w-6 h-6 text-purple-600 dark:text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
+            {/* Team Owners */}
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 transition-colors">
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {t('team.teamOwner')} ({owners.length})
+                </h3>
+              </div>
+              <div className="p-6">
+                {owners.length === 0 ? (
+                  <p className="text-center text-gray-500 dark:text-slate-400 py-8">
+                    No owners
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {owners.map((owner) => (
+                      <div key={owner.id} className="flex items-center justify-between p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-100 dark:border-purple-800">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 rounded-full bg-purple-200 dark:bg-purple-700 flex items-center justify-center">
+                            <svg className="w-6 h-6 text-purple-600 dark:text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900 dark:text-white">
+                              {owner.displayName || owner.email} {owner.id === currentUser?.uid && '(Tu)'}
+                            </p>
+                            <p className="text-sm text-gray-500 dark:text-slate-400">{owner.email}</p>
+                          </div>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getRoleBadgeColor(TeamRole.OWNER)}`}>
+                          {t('team.owner')}
+                        </span>
+                      </div>
+                    ))}
                   </div>
-                  <div>
-                    <p className="font-medium text-gray-900 dark:text-white">
-                      {userProfile?.displayName || currentUser?.displayName || currentUser?.email} (Tu)
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-slate-400">{currentUser?.email}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Administrators */}
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 transition-colors">
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {t('team.administrators')} ({admins.length})
+                </h3>
+              </div>
+              <div className="p-6">
+                {admins.length === 0 ? (
+                  <p className="text-center text-gray-500 dark:text-slate-400 py-8">
+                    {t('team.noAdmins')}
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {admins.map((admin) => (
+                      <div key={admin.id} className="flex items-center justify-between p-4 border border-gray-200 dark:border-slate-700 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 rounded-full bg-blue-200 dark:bg-blue-700 flex items-center justify-center">
+                            <svg className="w-6 h-6 text-blue-600 dark:text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900 dark:text-white">
+                              {admin.displayName || admin.email} {admin.id === currentUser?.uid && '(Tu)'}
+                            </p>
+                            <p className="text-sm text-gray-500 dark:text-slate-400">{admin.email}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getRoleBadgeColor(TeamRole.ADMIN)}`}>
+                            {t('team.admin')}
+                          </span>
+                          {admin.id !== currentUser?.uid && (
+                            <button
+                              onClick={() => promptRemoveMember(admin.id)}
+                              className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm font-medium transition-colors"
+                            >
+                              {t('team.remove')}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-                <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getRoleBadgeColor(TeamRole.OWNER)}`}>
-                  {t('team.owner')}
-                </span>
+                )}
               </div>
             </div>
 
@@ -304,41 +361,43 @@ export default function TeamManagement() {
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 transition-colors">
               <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {t('team.teamMembers')} ({teamMembers.length})
+                  {t('team.teamMembers')} ({members.length})
                 </h3>
               </div>
               <div className="p-6">
-                {teamMembers.length === 0 ? (
+                {members.length === 0 ? (
                   <p className="text-center text-gray-500 dark:text-slate-400 py-8">
                     {t('team.noMembers')}
                   </p>
                 ) : (
                   <div className="space-y-3">
-                    {teamMembers.map((member) => (
+                    {members.map((member) => (
                       <div key={member.id} className="flex items-center justify-between p-4 border border-gray-200 dark:border-slate-700 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
                         <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-slate-600 flex items-center justify-center">
-                            <svg className="w-6 h-6 text-gray-600 dark:text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <div className="w-10 h-10 rounded-full bg-green-200 dark:bg-green-700 flex items-center justify-center">
+                            <svg className="w-6 h-6 text-green-600 dark:text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                             </svg>
                           </div>
                           <div>
-                            <p className="font-medium text-gray-900 dark:text-white">{member.email}</p>
-                            <p className="text-sm text-gray-500 dark:text-slate-400">
-                              {t('team.joined')} {formatDate(member.acceptedAt)}
+                            <p className="font-medium text-gray-900 dark:text-white">
+                              {member.displayName || member.email} {member.id === currentUser?.uid && '(Tu)'}
                             </p>
+                            <p className="text-sm text-gray-500 dark:text-slate-400">{member.email}</p>
                           </div>
                         </div>
                         <div className="flex items-center space-x-3">
-                          <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getRoleBadgeColor(member.role)}`}>
-                            {member.role === TeamRole.ADMIN ? t('team.admin') : t('team.member')}
+                          <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getRoleBadgeColor(TeamRole.MEMBER)}`}>
+                            {t('team.member')}
                           </span>
-                          <button
-                            onClick={() => promptRemoveMember(member.id)}
-                            className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm font-medium transition-colors"
-                          >
-                            {t('team.remove')}
-                          </button>
+                          {member.id !== currentUser?.uid && (
+                            <button
+                              onClick={() => promptRemoveMember(member.id)}
+                              className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm font-medium transition-colors"
+                            >
+                              {t('team.remove')}
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -448,7 +507,12 @@ export default function TeamManagement() {
         isOpen={showInviteModal}
         onClose={() => setShowInviteModal(false)}
         onInvitationCreated={fetchTeamData}
-        existingEmails={[...teamMembers.map(m => m.email), ...pendingInvitations.map(i => i.email)]}
+        existingEmails={[
+          ...owners.map(o => o.email),
+          ...admins.map(a => a.email),
+          ...members.map(m => m.email),
+          ...pendingInvitations.map(i => i.email)
+        ]}
       />
 
       {/* Cancel Invitation Confirm Dialog */}
@@ -487,8 +551,9 @@ export default function TeamManagement() {
         onClose={() => setShowAddDepartmentModal(false)}
         onDepartmentAdded={fetchDepartments}
         teamMembers={[
-          { id: currentUser?.uid || '', email: currentUser?.email || '', displayName: userProfile?.displayName || currentUser?.displayName },
-          ...teamMembers.map(m => ({ id: m.id, email: m.email, displayName: m.displayName }))
+          ...owners.map(o => ({ id: o.id, email: o.email, displayName: o.displayName })),
+          ...admins.map(a => ({ id: a.id, email: a.email, displayName: a.displayName })),
+          ...members.map(m => ({ id: m.id, email: m.email, displayName: m.displayName }))
         ]}
       />
 

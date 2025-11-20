@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useAuth, hasTeamAccess, isOwner } from '../contexts/AuthContext';
+import { useAuth, hasTeamAccess } from '../contexts/AuthContext';
 import { Disclosure, DisclosureButton, DisclosurePanel, Menu, MenuButton, MenuItem, MenuItems, Transition } from '@headlessui/react';
 import { Bars3Icon, XMarkIcon, GlobeAltIcon, SunIcon, MoonIcon, ComputerDesktopIcon } from '@heroicons/react/24/outline';
 import { XMarkIcon as XMarkIconSolid } from '@heroicons/react/20/solid';
@@ -139,7 +139,7 @@ export default function AppShell({ children, title }: { children: React.ReactNod
           { name: t('nav.suppliers'), href: '/suppliers', current: location.pathname === '/suppliers' },
         ]
       : []),
-    ...(isOwner(userProfile)
+    ...(hasTeamAccess(userProfile)
       ? [
           { name: t('nav.team'), href: '/team', current: location.pathname === '/team' },
         ]

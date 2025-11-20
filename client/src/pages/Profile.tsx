@@ -239,24 +239,25 @@ export default function Profile() {
                 {t('profile.accountType')}
               </label>
               <div className="mt-2 flex gap-2">
-                {userProfile?.role === 'owner' && (
+                {userProfile?.role === 'owner' ? (
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 transition-colors">
                     {t('profile.owner')}
                   </span>
-                )}
-                {userProfile?.role === 'admin' && (
+                ) : userProfile?.role === 'admin' ? (
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 transition-colors">
                     {t('profile.admin')}
                   </span>
-                )}
-                {userProfile?.role === 'member' && (
+                ) : userProfile?.role === 'member' ? (
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 transition-colors">
                     {t('profile.teamMember')}
                   </span>
-                )}
-                {userProfile?.role === 'user' && (
+                ) : userProfile?.role === 'user' ? (
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200 transition-colors">
                     {t('profile.customer')}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 transition-colors">
+                    Unknown ({userProfile?.role || 'no role'})
                   </span>
                 )}
               </div>

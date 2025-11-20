@@ -24,9 +24,9 @@ export const updateMembersToAdmin = functions.https.onRequest(async (req, res) =
       const userData = doc.data();
 
       if (userData.email && emailsToUpdate.includes(userData.email.toLowerCase())) {
-        if (userData.role === 'member') {
+        if (userData.role === 'member' || userData.role === 'user') {
           batch.update(doc.ref, { role: 'admin' });
-          console.log(`Updating ${userData.email} from 'member' to 'admin'`);
+          console.log(`Updating ${userData.email} from '${userData.role}' to 'admin'`);
           updatedCount++;
         }
       }
