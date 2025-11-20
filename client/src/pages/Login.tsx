@@ -132,7 +132,7 @@ export default function Login() {
       <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-[480px]">
         <div className="bg-white dark:bg-slate-800 px-6 py-12 shadow-sm sm:rounded-lg sm:px-12 border border-slate-200 dark:border-slate-700 transition-colors">
           {error && (
-            <div className="mb-6 bg-red-50 border border-red-200 text-red-800 rounded-lg p-4 text-sm">
+            <div data-testid="login-error-message" className="mb-6 bg-red-50 border border-red-200 text-red-800 rounded-lg p-4 text-sm">
               {error}
             </div>
           )}

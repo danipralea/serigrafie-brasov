@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, hasTeamAccess } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { collection, query, getDocs, addDoc, Timestamp } from 'firebase/firestore';
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/20/solid';
@@ -233,13 +233,14 @@ export default function ProductTypeAutocomplete({
     }
   }
 
-  const canAddProductType = userProfile?.isAdmin || userProfile?.isTeamMember;
+  const canAddProductType = hasTeamAccess(userProfile);
 
   return (
     <div className="relative" ref={dropdownRef}>
       {/* Search Input */}
       <div className="relative">
         <input
+          data-testid="product-type-input"
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -276,10 +277,11 @@ export default function ProductTypeAutocomplete({
 
       {/* Dropdown with product types */}
       {showDropdown && filteredProductTypes.length > 0 && (
-        <div className="absolute z-10 mt-1 w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md shadow-lg max-h-60 overflow-auto">
+        <div data-testid="product-type-dropdown" className="absolute z-10 mt-1 w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md shadow-lg max-h-60 overflow-auto">
           {filteredProductTypes.map((productType) => (
             <button
               key={productType.id}
+              data-testid={`product-type-option-${productType.id}`}
               type="button"
               onMouseDown={(e) => {
                 e.preventDefault(); // Prevent blur from firing before click
@@ -312,8 +314,8 @@ export default function ProductTypeAutocomplete({
             <div className="flex-1 border-t border-gray-300 dark:border-slate-600"></div>
           </div>
 
-          {/* Only show Add button for Admin/Team Members */}
-          {(userProfile?.isAdmin || userProfile?.isTeamMember) && (
+          {/* Only show Add button for Team Members */}
+          {hasTeamAccess(userProfile) && (
             <>
               <button
                 type="button"

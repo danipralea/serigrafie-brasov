@@ -16,6 +16,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import { AuthProviderType, UserRoleType, UserRole } from '../types';
 
 // Extend window type to include recaptchaVerifier
 declare global {
@@ -28,11 +29,11 @@ interface UserProfile {
   email: string | null;
   phoneNumber?: string | null;
   displayName: string | null;
-  isTeamMember: boolean;
-  isAdmin: boolean;
+  role: UserRoleType;
   teamOwnerId?: string | null;
   createdAt: Date;
   photoURL?: string | null;
+  authProvider?: AuthProviderType;
 }
 
 interface AuthContextType {
@@ -98,13 +99,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
         } else {
           // Create new user profile
+          // Get the primary auth provider
+          const authProvider = user.providerData[0]?.providerId || 'password';
+
           const newProfile = {
             email: user.email,
             phoneNumber: user.phoneNumber,
             displayName: user.displayName || user.email || user.phoneNumber,
-            isTeamMember: false,
-            isAdmin: false,
-            createdAt: new Date()
+            role: UserRole.USER, // New signups are users until invited to team
+            createdAt: new Date(),
+            authProvider
           };
           await setDoc(userDocRef, newProfile);
           setUserProfile(newProfile);
@@ -259,4 +263,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
       {!loading && children}
     </AuthContext.Provider>
   );
+}
+
+// Helper functions for role-based access control
+export function isOwner(profile: UserProfile | null): boolean {
+  return profile?.role === UserRole.OWNER;
+}
+
+export function isAdmin(profile: UserProfile | null): boolean {
+  return profile?.role === UserRole.ADMIN;
+}
+
+export function isMember(profile: UserProfile | null): boolean {
+  return profile?.role === UserRole.MEMBER;
+}
+
+export function isRegularUser(profile: UserProfile | null): boolean {
+  return profile?.role === UserRole.USER;
+}
+
+export function hasTeamAccess(profile: UserProfile | null): boolean {
+  return profile?.role === UserRole.OWNER || profile?.role === UserRole.ADMIN || profile?.role === UserRole.MEMBER;
+}
+
+export function hasAdminAccess(profile: UserProfile | null): boolean {
+  return profile?.role === UserRole.OWNER || profile?.role === UserRole.ADMIN;
 }

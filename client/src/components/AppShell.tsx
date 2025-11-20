@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, hasTeamAccess, isOwner } from '../contexts/AuthContext';
 import { Disclosure, DisclosureButton, DisclosurePanel, Menu, MenuButton, MenuItem, MenuItems, Transition } from '@headlessui/react';
 import { Bars3Icon, XMarkIcon, GlobeAltIcon, SunIcon, MoonIcon, ComputerDesktopIcon } from '@heroicons/react/24/outline';
 import { XMarkIcon as XMarkIconSolid } from '@heroicons/react/20/solid';
@@ -64,8 +64,8 @@ export default function AppShell({ children, title }: { children: React.ReactNod
       return;
     }
 
-    // Only for admins and team members
-    if (!userProfile.isAdmin && !userProfile.isTeamMember) {
+    // Only for team members
+    if (!hasTeamAccess(userProfile)) {
       return;
     }
 
@@ -129,17 +129,17 @@ export default function AppShell({ children, title }: { children: React.ReactNod
   const navigation = [
     { name: t('nav.orders'), href: '/dashboard', current: location.pathname === '/dashboard' },
     { name: t('nav.calendar'), href: '/calendar', current: location.pathname === '/calendar' },
-    ...(userProfile?.isAdmin || userProfile?.isTeamMember
+    ...(hasTeamAccess(userProfile)
       ? [
           { name: t('nav.clients'), href: '/clients', current: location.pathname === '/clients' },
         ]
       : []),
-    ...(userProfile?.isAdmin || userProfile?.isTeamMember
+    ...(hasTeamAccess(userProfile)
       ? [
           { name: t('nav.suppliers'), href: '/suppliers', current: location.pathname === '/suppliers' },
         ]
       : []),
-    ...(userProfile?.isAdmin
+    ...(isOwner(userProfile)
       ? [
           { name: t('nav.team'), href: '/team', current: location.pathname === '/team' },
         ]
@@ -294,7 +294,7 @@ export default function AppShell({ children, title }: { children: React.ReactNod
                 </Menu>
 
                 {/* Profile dropdown */}
-                <Menu as="div" className="relative inline-block ml-1">
+                <Menu as="div" className="relative inline-block ml-1" data-testid="nav-user-menu">
                   <MenuButton className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:focus-visible:outline-blue-500 transition-colors">
                     <span className="sr-only">Open user menu</span>
                     {userProfile?.photoURL ? (
@@ -321,6 +321,7 @@ export default function AppShell({ children, title }: { children: React.ReactNod
                       {userNavigation.map((item) => (
                         <MenuItem key={item.name}>
                           <button
+                            data-testid={item.name === t('nav.signOut') ? 'nav-logout-button' : undefined}
                             onClick={item.onClick}
                             className="w-full text-left block px-4 py-2 text-sm text-slate-700 data-focus:bg-slate-100 data-focus:text-slate-900 data-focus:outline-hidden dark:text-slate-300 dark:data-focus:bg-white/5 dark:data-focus:text-white"
                           >

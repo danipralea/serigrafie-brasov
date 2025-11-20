@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { PhotoIcon, TrashIcon } from '@heroicons/react/24/solid';
 import ProductTypeAutocomplete from './ProductTypeAutocomplete';
 import { uploadFile } from '../services/storageService';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, hasTeamAccess } from '../contexts/AuthContext';
 
 interface ProductTypeOption {
   id: string;
@@ -115,8 +115,8 @@ function SubOrderItem({ subOrder, index, onChange, onRemove, canRemove, departme
           />
         </div>
 
-        {/* Department Selection - Only for Admin/Team Members */}
-        {(userProfile?.isAdmin || userProfile?.isTeamMember) && departments.length > 0 && (
+        {/* Department Selection - Only for Team Members */}
+        {hasTeamAccess(userProfile) && departments.length > 0 && (
           <div>
             <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
               {t('order.department')} {t('common.optional')}

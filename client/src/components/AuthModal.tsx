@@ -149,6 +149,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }) {
       {/* Modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div
+          data-testid="auth-modal"
           className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-md w-full p-6 transition-colors"
           onClick={(e) => e.stopPropagation()}
         >
@@ -158,6 +159,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }) {
                authMode === 'phone-verify' ? 'Verificare telefon' : 'Autentificare'}
             </h3>
             <button
+              data-testid="auth-modal-close"
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 dark:text-slate-400 dark:hover:text-slate-300 transition-colors"
             >
@@ -181,6 +183,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }) {
 
               {/* Google Sign In */}
               <button
+                data-testid="auth-modal-google-button"
                 onClick={handleGoogleSignIn}
                 disabled={loading}
                 className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
@@ -208,6 +211,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }) {
 
               {/* Email/Password Option */}
               <button
+                data-testid="auth-modal-email-button"
                 onClick={() => {
                   setAuthMode('email');
                   setError('');
@@ -240,6 +244,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }) {
                   Email
                 </label>
                 <input
+                  data-testid="auth-modal-email-input"
                   type="email"
                   id="email"
                   value={email}
@@ -254,6 +259,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }) {
                   Parolă
                 </label>
                 <input
+                  data-testid="auth-modal-password-input"
                   type="password"
                   id="password"
                   value={password}
@@ -265,6 +271,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }) {
               </div>
               <div className="flex gap-3 pt-2">
                 <button
+                  data-testid="auth-modal-back-button"
                   type="button"
                   onClick={() => {
                     setAuthMode('options');
@@ -275,6 +282,7 @@ export default function AuthModal({ isOpen, onClose, onSuccess }) {
                   Înapoi
                 </button>
                 <button
+                  data-testid="auth-modal-submit-button"
                   type="submit"
                   disabled={loading}
                   className="flex-1 px-4 py-2 rounded-lg text-white font-medium bg-gradient-to-r from-blue-600 to-cyan-500 hover:opacity-90 transition-opacity disabled:opacity-50"

@@ -22,7 +22,17 @@ export const ProductType = {
 
 export type ProductTypeType = typeof ProductType[keyof typeof ProductType];
 
-// Team related types
+// User role types
+export const UserRole = {
+  OWNER: 'owner',
+  ADMIN: 'admin',
+  MEMBER: 'member',
+  USER: 'user'
+} as const;
+
+export type UserRoleType = typeof UserRole[keyof typeof UserRole];
+
+// Legacy: Keep TeamRole for backward compatibility, but use UserRole for new code
 export const TeamRole = {
   OWNER: 'owner',
   ADMIN: 'admin',
@@ -39,6 +49,14 @@ export const InvitationStatus = {
 } as const;
 
 export type InvitationStatusType = typeof InvitationStatus[keyof typeof InvitationStatus];
+
+export const AuthProvider = {
+  GOOGLE: 'google.com',
+  PASSWORD: 'password',
+  PHONE: 'phone'
+} as const;
+
+export type AuthProviderType = typeof AuthProvider[keyof typeof AuthProvider];
 
 // Supplier related types
 export interface ContactPerson {

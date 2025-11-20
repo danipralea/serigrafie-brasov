@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, hasTeamAccess } from '../contexts/AuthContext';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { PlusIcon } from '@heroicons/react/20/solid';
@@ -16,6 +16,7 @@ interface Client {
   email?: string;
   phone?: string;
   company?: string;
+  authUid?: string; // Firebase Auth UID of the client
 }
 
 interface PlaceOrderModalProps {
@@ -53,8 +54,8 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
         setContactPhone(currentUser.phoneNumber);
       }
 
-      // Fetch departments for admin/team members
-      if ((userProfile?.isAdmin || userProfile?.isTeamMember) && currentUser) {
+      // Fetch departments for team members
+      if (hasTeamAccess(userProfile) && currentUser) {
         fetchDepartments();
       }
     }
@@ -67,8 +68,8 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
       // Determine whose departments to fetch
       let ownerId = currentUser.uid;
 
-      // If user is a team member, fetch team owner's departments
-      if (userProfile?.isTeamMember && userProfile?.teamOwnerId) {
+      // If user is not the owner, fetch team owner's departments
+      if (hasTeamAccess(userProfile) && userProfile?.teamOwnerId) {
         ownerId = userProfile.teamOwnerId;
       }
 
@@ -141,17 +142,17 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
   }
 
   function validateForm(): boolean {
-    const isAdminOrTeam = userProfile?.isAdmin || userProfile?.isTeamMember;
+    const isTeamMember = hasTeamAccess(userProfile);
 
-    // Validate order name (only for admin/team members)
-    if (isAdminOrTeam && (!orderName || !orderName.trim())) {
+    // Validate order name (only for team members)
+    if (isTeamMember && (!orderName || !orderName.trim())) {
       setOrderNameError(t('order.errorOrderNameRequired'));
       return false;
     }
     setOrderNameError('');
 
-    // Validate client (only for admin/team members)
-    if (isAdminOrTeam && !selectedClient) {
+    // Validate client (only for team members)
+    if (isTeamMember && !selectedClient) {
       setClientError(t('order.errorClientRequired'));
       return false;
     }
@@ -193,12 +194,38 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
     if (!validateForm() || !currentUser) return;
 
     // For regular clients, use their own info as the client
-    const isAdminOrTeam = userProfile?.isAdmin || userProfile?.isTeamMember;
+    const isTeamMember = hasTeamAccess(userProfile);
     let clientData;
+    let clientAuthUid = currentUser.uid; // Default to current user
 
-    if (isAdminOrTeam) {
+    if (isTeamMember) {
       // Admin/Team must select a client
       if (!selectedClient) return;
+
+      // First check if client document has authUid stored
+      if (selectedClient.authUid) {
+        clientAuthUid = selectedClient.authUid;
+      } else if (selectedClient.email) {
+        // Fallback: Look up client's Auth UID by email if they have an account
+        try {
+          const usersRef = collection(db, 'users');
+          const userQuery = query(usersRef, where('email', '==', selectedClient.email.toLowerCase()));
+          const userSnapshot = await getDocs(userQuery);
+
+          if (!userSnapshot.empty) {
+            // Found the client's user account
+            clientAuthUid = userSnapshot.docs[0].id;
+          } else {
+            // Client doesn't have a user account yet, use admin's UID
+            clientAuthUid = currentUser.uid;
+          }
+        } catch (error) {
+          console.error('Error looking up client Auth UID:', error);
+          // Fallback to admin's UID if lookup fails
+          clientAuthUid = currentUser.uid;
+        }
+      }
+
       clientData = {
         clientId: selectedClient.id,
         clientName: selectedClient.name,
@@ -232,17 +259,17 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
       const ordersRef = collection(db, 'orders');
       const orderRef = doc(ordersRef);
 
-      const isAdminOrTeam = userProfile?.isAdmin || userProfile?.isTeamMember;
+      const isTeamMember = hasTeamAccess(userProfile);
       // Prioritize Firestore userProfile.displayName over Firebase Auth
       const userName = userProfile?.displayName || currentUser.displayName || currentUser.email || currentUser.phoneNumber || '';
 
       const orderData = {
-        ...(isAdminOrTeam && orderName.trim() ? { orderName: orderName.trim() } : {}),
+        ...(isTeamMember && orderName.trim() ? { orderName: orderName.trim() } : {}),
         ...clientData,
-        userId: currentUser.uid,
+        userId: clientAuthUid,
         userName: userName,
         userEmail: currentUser.email,
-        status: isAdminOrTeam
+        status: isTeamMember
           ? OrderStatus.PENDING
           : OrderStatus.PENDING_CONFIRMATION,
         createdAt: timestamp,
@@ -255,7 +282,7 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
       subOrders.forEach((so) => {
         const subOrderRef = doc(collection(db, 'orders', orderRef.id, 'subOrders'));
         const subOrderData = {
-          userId: currentUser.uid,  // Store userId for security rules
+          userId: clientAuthUid,  // Store userId for security rules
           productType: so.productType?.id || '',
           productTypeName: so.productType?.name || '',
           productTypeCustom: so.productType?.isCustom || false,
@@ -284,7 +311,7 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
         userId: currentUser.uid,
         userName: userName,
         userEmail: currentUser.email,
-        text: userProfile?.isAdmin || userProfile?.isTeamMember
+        text: hasTeamAccess(userProfile)
           ? t('dashboard.orderModal.orderCreatedByTeam')
           : t('dashboard.orderModal.orderCreatedByClient'),
         isSystem: true,
@@ -376,8 +403,8 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
               </div>
             )}
 
-            {/* Order Name - Only for Admin/Team Members */}
-            {(userProfile?.isAdmin || userProfile?.isTeamMember) && (
+            {/* Order Name - Only for Team Members */}
+            {hasTeamAccess(userProfile) && (
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
                   {t('order.orderName')} *
@@ -400,8 +427,8 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
               </div>
             )}
 
-            {/* Client Section - Only for Admin/Team Members */}
-            {(userProfile?.isAdmin || userProfile?.isTeamMember) && (
+            {/* Client Section - Only for Team Members */}
+            {hasTeamAccess(userProfile) && (
               <div className="mb-6">
                 <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">
                   {t('order.clientInformation')}
@@ -468,7 +495,7 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
             )}
 
             {/* Contact Phone for Regular Clients */}
-            {!userProfile?.isAdmin && !userProfile?.isTeamMember && (
+            {!hasTeamAccess(userProfile) && (
               <div className="mb-6">
                 <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">
                   {t('order.contactPhone')}

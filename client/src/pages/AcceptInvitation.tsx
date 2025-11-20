@@ -85,10 +85,10 @@ export default function AcceptInvitation() {
         return;
       }
 
-      // Update user profile to mark as team member
+      // Update user profile with role from invitation
       const userDocRef = doc(db, 'users', userCredential.user.uid);
       await updateDoc(userDocRef, {
-        isTeamMember: true,
+        role: invitation.role, // Role must be specified in invitation
         teamOwnerId: invitation.invitedBy,
       });
 
@@ -142,10 +142,10 @@ export default function AcceptInvitation() {
       // Create account with the invitation email
       const userCredential = await signup(invitation.email, password);
 
-      // Update user profile to mark as team member
+      // Update user profile with role from invitation
       const userDocRef = doc(db, 'users', userCredential.user.uid);
       await updateDoc(userDocRef, {
-        isTeamMember: true,
+        role: invitation.role, // Role must be specified in invitation
         teamOwnerId: invitation.invitedBy,
       });
 
@@ -183,10 +183,10 @@ export default function AcceptInvitation() {
     setError('');
 
     try {
-      // Update user profile to mark as team member
+      // Update user profile with role from invitation
       const userDocRef = doc(db, 'users', currentUser.uid);
       await updateDoc(userDocRef, {
-        isTeamMember: true,
+        role: invitation.role, // Role must be specified in invitation
         teamOwnerId: invitation.invitedBy,
       });
 
@@ -320,7 +320,7 @@ export default function AcceptInvitation() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{t('acceptInvitation.teamInvitation')}</h1>
           {invitation && (
             <p className="text-gray-600 dark:text-slate-400">
-              You've been invited to join {invitation.invitedByName}'s team
+              {t('acceptInvitation.invitedToJoin', { name: invitation.invitedByName })}
             </p>
           )}
         </div>
@@ -391,7 +391,7 @@ export default function AcceptInvitation() {
                   <button
                     onClick={() => setShowEmailSignup(true)}
                     disabled={accepting}
-                    className="w-full px-4 py-2 bg-vivid-cyan text-white rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-2 bg-vivid-cyan text-white rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed border-2 border-vivid-cyan"
                   >
                     {t('acceptInvitation.createAccountWithEmail')}
                   </button>

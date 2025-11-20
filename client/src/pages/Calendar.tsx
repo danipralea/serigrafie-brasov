@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, hasTeamAccess } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, onSnapshot, Timestamp, doc, getDoc } from 'firebase/firestore';
 import { OrderStatus, ProductType } from '../types';
@@ -47,8 +47,8 @@ export default function Calendar() {
     const ordersRef = collection(db, 'orders');
     let q;
 
-    // Admins and team members see all orders
-    if (userProfile?.isAdmin || userProfile?.isTeamMember) {
+    // Team members see all orders
+    if (hasTeamAccess(userProfile)) {
       q = query(ordersRef);
     } else {
       // Regular clients only see their own orders

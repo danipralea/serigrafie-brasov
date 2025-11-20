@@ -173,6 +173,7 @@ export default function ClientAutocomplete({ selectedClient, onSelectClient, err
       {/* Search Input */}
       <div className="relative">
         <input
+          data-testid="client-autocomplete-input"
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -203,10 +204,11 @@ export default function ClientAutocomplete({ selectedClient, onSelectClient, err
 
       {/* Dropdown with matching clients */}
       {showDropdown && filteredClients.length > 0 && (
-        <div className="absolute z-10 mt-1 w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md shadow-lg max-h-60 overflow-auto">
+        <div data-testid="client-autocomplete-dropdown" className="absolute z-10 mt-1 w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md shadow-lg max-h-60 overflow-auto">
           {filteredClients.map((client) => (
             <button
               key={client.id}
+              data-testid={`client-option-${client.id}`}
               type="button"
               onClick={() => handleSelectClient(client)}
               className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors"

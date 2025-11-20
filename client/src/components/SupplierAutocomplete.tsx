@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, hasTeamAccess } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { collection, query, getDocs, addDoc, Timestamp } from 'firebase/firestore';
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/20/solid';
@@ -120,8 +120,8 @@ export default function SupplierAutocomplete({ selectedSupplier, onSelectSupplie
       return;
     }
 
-    // Check permissions - only admins and team members can add suppliers
-    if (!userProfile?.isAdmin && !userProfile?.isTeamMember) {
+    // Check permissions - only team members can add suppliers
+    if (!hasTeamAccess(userProfile)) {
       showError(t('common.permissionDenied'));
       return;
     }
@@ -182,7 +182,7 @@ export default function SupplierAutocomplete({ selectedSupplier, onSelectSupplie
     }
   }
 
-  const canAddSupplier = userProfile?.isAdmin || userProfile?.isTeamMember;
+  const canAddSupplier = hasTeamAccess(userProfile);
 
   return (
     <div className="relative" ref={dropdownRef}>

@@ -525,7 +525,7 @@
   },
   "acceptInvitation": {
     "teamInvitation": "Team Invitation",
-    "invitedToJoin": "You've been invited to join",
+    "invitedToJoin": "You've been invited to join {{name}}'s team",
     "invitedBy": "Invited by",
     "email": "Email",
     "role": "Role",
@@ -609,6 +609,7 @@
     "nameAZ": "Name (A-Z)",
     "nameZA": "Name (Z-A)",
     "added": "Added",
+    "hasAccount": "Has account",
     "deleteClient": "Delete client",
     "deleteError": "Failed to delete client",
     "deleteDialog": {

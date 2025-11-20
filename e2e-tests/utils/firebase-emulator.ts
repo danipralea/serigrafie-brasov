@@ -5,11 +5,11 @@ import fetch from 'node-fetch';
 const execAsync = promisify(exec);
 
 const EMULATOR_PORTS = {
-  auth: 9099,
-  firestore: 8080,
-  storage: 9199,
-  functions: 5001,
-  ui: 4000
+  auth: 9109,
+  firestore: 8090,
+  storage: 9209,
+  functions: 5011,
+  ui: 4010
 };
 
 export class FirebaseEmulatorManager {

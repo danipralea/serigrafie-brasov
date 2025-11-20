@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, hasTeamAccess } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy as firestoreOrderBy, doc, updateDoc, addDoc, deleteDoc, Timestamp, onSnapshot } from 'firebase/firestore';
 import { OrderStatus, ProductType } from '../types';
@@ -106,8 +106,8 @@ export default function Dashboard() {
     const ordersRef = collection(db, 'orders');
     let q;
 
-    // Admins and team members see all orders
-    if (userProfile?.isAdmin || userProfile?.isTeamMember) {
+    // Team members see all orders
+    if (hasTeamAccess(userProfile)) {
       q = query(
         ordersRef,
         firestoreOrderBy('createdAt', 'desc')
@@ -156,7 +156,7 @@ export default function Dashboard() {
       );
 
       // Sort in memory for client queries (to avoid composite index requirement)
-      if (!userProfile?.isAdmin && !userProfile?.isTeamMember) {
+      if (!hasTeamAccess(userProfile)) {
         ordersWithSubOrders.sort((a, b) => {
           const timeA = a.createdAt?.toMillis() || 0;
           const timeB = b.createdAt?.toMillis() || 0;
@@ -381,7 +381,7 @@ export default function Dashboard() {
         userName: userProfile?.displayName || currentUser.displayName || currentUser.email || 'Unknown',
         userEmail: currentUser.email || '',
         userPhotoURL: userProfile?.photoURL || '',
-        isAdminOrTeamMember: userProfile?.isAdmin || userProfile?.isTeamMember || false,
+        isAdminOrTeamMember: hasTeamAccess(userProfile),
         text: updateText.trim() || '',
         createdAt: Timestamp.now()
       };
@@ -683,8 +683,8 @@ export default function Dashboard() {
   return (
     <AppShell title={t('dashboard.title')}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Cards - Only for admins and team members */}
-        {(userProfile?.isAdmin || userProfile?.isTeamMember) && (
+        {/* Stats Cards - Only for team members */}
+        {hasTeamAccess(userProfile) && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-6 border border-slate-200 dark:border-slate-700 transition-colors">
               <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">{t('dashboard.stats.total')}</p>
@@ -705,8 +705,8 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Filters and Search - Only for admins and team members */}
-        {(userProfile?.isAdmin || userProfile?.isTeamMember) && (
+        {/* Filters and Search - Only for team members */}
+        {hasTeamAccess(userProfile) && (
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-6 mb-6 border border-slate-200 dark:border-slate-700 transition-colors">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Search */}
@@ -815,7 +815,7 @@ export default function Dashboard() {
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 transition-colors">
           <div className="px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center gap-2">
             <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white whitespace-nowrap">
-              {t(userProfile?.isAdmin || userProfile?.isTeamMember ? 'dashboard.table.orders' : 'dashboard.table.yourOrders')} ({filteredOrders.length})
+              {t(hasTeamAccess(userProfile) ? 'dashboard.table.orders' : 'dashboard.table.yourOrders')} ({filteredOrders.length})
             </h2>
             <button
               data-testid="dashboard-add-order-button"
@@ -889,7 +889,7 @@ export default function Dashboard() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                       {t('dashboard.table.date')}
                     </th>
-                    {activeTab === 'past' && !userProfile?.isAdmin && !userProfile?.isTeamMember && (
+                    {activeTab === 'past' && !hasTeamAccess(userProfile) && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                         {t('dashboard.table.actions')}
                       </th>
@@ -946,7 +946,7 @@ export default function Dashboard() {
                             return `${dateStr} - ${timeStr}`;
                           })()}
                         </td>
-                        {activeTab === 'past' && !userProfile?.isAdmin && !userProfile?.isTeamMember && (
+                        {activeTab === 'past' && !hasTeamAccess(userProfile) && (
                           <td className="px-6 py-4 whitespace-nowrap text-sm" onClick={(e) => e.stopPropagation()}>
                             <button
                               data-testid={`order-reorder-button-${order.id}`}

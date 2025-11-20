@@ -11,12 +11,12 @@ test.describe('Authentication', () => {
     // Wait for form to be visible
     await page.waitForSelector('form', { timeout: 10000 });
 
-    // Fill in credentials using input IDs
-    await page.locator('#email').fill(testUsers.client.email);
-    await page.locator('#password').fill(testUsers.client.password);
+    // Fill in credentials using data-testid
+    await page.locator('[data-testid="login-email-input"]').fill(testUsers.client.email);
+    await page.locator('[data-testid="login-password-input"]').fill(testUsers.client.password);
 
-    // Submit form - handle both Romanian and English
-    await page.getByRole('button', { name: /autentifică-te|sign in/i }).click();
+    // Submit form
+    await page.locator('[data-testid="login-submit-button"]').click();
 
     // Wait for dashboard to load
     await page.waitForURL(/.*dashboard.*/, { timeout: 15000 });
@@ -24,8 +24,8 @@ test.describe('Authentication', () => {
     // Verify we're on the dashboard
     await expect(page).toHaveURL(/.*dashboard.*/);
 
-    // Verify user menu button is visible (check for the user menu specifically)
-    await expect(page.getByRole('button', { name: new RegExp(testUsers.client.displayName) })).toBeVisible({ timeout: 10000 });
+    // Verify user menu button is visible
+    await expect(page.locator('[data-testid="nav-user-menu"]')).toBeVisible({ timeout: 10000 });
   });
 
   test('should show error for invalid credentials', async ({ page }) => {
@@ -37,14 +37,14 @@ test.describe('Authentication', () => {
     await page.waitForSelector('form', { timeout: 10000 });
 
     // Fill in invalid credentials
-    await page.locator('#email').fill('invalid@test.com');
-    await page.locator('#password').fill('wrongpassword');
+    await page.locator('[data-testid="login-email-input"]').fill('invalid@test.com');
+    await page.locator('[data-testid="login-password-input"]').fill('wrongpassword');
 
-    // Submit form - handle both Romanian and English
-    await page.getByRole('button', { name: /autentifică-te|sign in/i }).click();
+    // Submit form
+    await page.locator('[data-testid="login-submit-button"]').click();
 
-    // Wait for error message - check for Romanian or English
-    await expect(page.getByText(/invalid|incorrect|wrong|error|greșit|incorect/i)).toBeVisible({ timeout: 10000 });
+    // Wait for error message
+    await expect(page.locator('[data-testid="login-error-message"]')).toBeVisible({ timeout: 10000 });
   });
 
   test('should logout successfully', async ({ page, testUsers }) => {
@@ -56,18 +56,18 @@ test.describe('Authentication', () => {
     await page.waitForSelector('form', { timeout: 10000 });
 
     // Login
-    await page.locator('#email').fill(testUsers.client.email);
-    await page.locator('#password').fill(testUsers.client.password);
-    await page.getByRole('button', { name: /autentifică-te|sign in/i }).click();
+    await page.locator('[data-testid="login-email-input"]').fill(testUsers.client.email);
+    await page.locator('[data-testid="login-password-input"]').fill(testUsers.client.password);
+    await page.locator('[data-testid="login-submit-button"]').click();
     await page.waitForURL(/.*dashboard.*/, { timeout: 15000 });
 
-    // Logout - click on user menu button
-    await page.getByRole('button', { name: new RegExp(testUsers.client.displayName) }).click();
+    // Open user menu
+    await page.locator('[data-testid="nav-user-menu"]').click();
 
-    // Click logout menu item - handle both Romanian and English
-    await page.getByRole('menuitem', { name: /logout|sign out|deconectare/i }).click();
+    // Click logout button
+    await page.locator('[data-testid="nav-logout-button"]').click();
 
-    // Verify we're redirected to login page (not landing page)
+    // Verify we're redirected to login page
     await expect(page).toHaveURL('/login', { timeout: 5000 });
   });
 });

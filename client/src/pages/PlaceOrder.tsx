@@ -116,6 +116,9 @@ export default function PlaceOrder() {
       // Commit all writes atomically
       await batch.commit();
 
+      // Small delay to ensure data is available in emulator/Firestore
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       showSuccess(t('placeOrder.orderCreated'));
       navigate('/dashboard');
     } catch (err: any) {

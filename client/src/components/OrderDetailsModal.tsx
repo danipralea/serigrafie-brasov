@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, hasTeamAccess, hasAdminAccess } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, doc, updateDoc, addDoc, deleteDoc, Timestamp } from 'firebase/firestore';
 import { OrderStatus } from '../types';
@@ -123,7 +123,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
         userName: userProfile?.displayName || currentUser!.displayName || currentUser!.email || 'Unknown',
         userEmail: currentUser!.email || '',
         userPhotoURL: userProfile?.photoURL || '',
-        isAdminOrTeamMember: userProfile?.isAdmin || userProfile?.isTeamMember || false,
+        isAdminOrTeamMember: hasTeamAccess(userProfile) || false,
         text: updateText.trim() || '',
         createdAt: Timestamp.now()
       };
@@ -429,7 +429,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
             <div>
               <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
                 {t('dashboard.orderModal.order')}
-                {(userProfile?.isAdmin || userProfile?.isTeamMember) && (
+                {hasTeamAccess(userProfile) && (
                   <span className="ml-2 text-sm font-mono text-slate-500 dark:text-slate-400">
                     #{selectedOrder.id.substring(0, 8).toUpperCase()}
                   </span>
@@ -446,7 +446,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {(userProfile?.isAdmin || userProfile?.isTeamMember) && (
+              {hasAdminAccess(userProfile) && (
                 <button
                   data-testid="delete-order-button"
                   onClick={() => setShowDeleteDialog(true)}
@@ -594,8 +594,8 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                         )}
                       </div>
 
-                      {/* Sub-order Status Update - Only for Admin/Team Members */}
-                      {(userProfile?.isAdmin || userProfile?.isTeamMember) && (
+                      {/* Sub-order Status Update - Only for Team Members */}
+                      {hasTeamAccess(userProfile) && (
                         <div className="mt-4 pt-4 border-t border-gray-200 dark:border-slate-600">
                           <h6 className="text-xs font-semibold text-gray-700 dark:text-slate-300 mb-2 uppercase tracking-wide">
                             {t('order.updateSubOrderStatus')}
@@ -687,7 +687,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
             )}
 
             {/* Status Update Section */}
-            {(userProfile?.isAdmin || userProfile?.isTeamMember) && (
+            {hasTeamAccess(userProfile) && (
               <div className="mb-6">
                 <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{t('dashboard.orderModal.updateStatus')}</h4>
                 <div className="flex gap-2 flex-wrap">
@@ -724,7 +724,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                   <div className="space-y-3">
                     {orderUpdates
                       .filter((update) => {
-                        const isClient = !userProfile?.isAdmin && !userProfile?.isTeamMember;
+                        const isClient = !hasTeamAccess(userProfile);
                         if (isClient && update.isSystem) {
                           return false;
                         }
@@ -733,7 +733,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                       .map((update) => {
                       const isSystemMessage = update.isSystem;
                       const isClientMessage = !isSystemMessage && !update.isAdminOrTeamMember;
-                      const canDelete = (userProfile?.isAdmin || userProfile?.isTeamMember) && !isSystemMessage && update.isAdminOrTeamMember;
+                      const canDelete = hasTeamAccess(userProfile) && !isSystemMessage && update.isAdminOrTeamMember;
 
                       return (
                         <div
@@ -812,7 +812,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                             {update.attachmentURL && (
                               <div className="mt-2">
                                 {update.attachmentType?.startsWith('image/') ? (
-                                  <a href={update.attachmentURL} target="_blank" rel="noopener noreferrer">
+                                  <a href={update.attachmentURL} target="_blank" rel="noopener noreferrer" data-testid="order-update-attachment-link">
                                     <img
                                       src={update.attachmentURL}
                                       alt={update.attachmentName}
@@ -825,6 +825,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                                     href={update.attachmentURL}
                                     target="_blank"
                                     rel="noopener noreferrer"
+                                    data-testid="order-update-attachment-link"
                                     className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
                                       isClientMessage
                                         ? 'bg-blue-500/20 border-blue-300 hover:bg-blue-500/30'

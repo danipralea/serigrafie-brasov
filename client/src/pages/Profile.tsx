@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, isOwner, hasAdminAccess, hasTeamAccess } from '../contexts/AuthContext';
 import { doc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
@@ -239,17 +239,22 @@ export default function Profile() {
                 {t('profile.accountType')}
               </label>
               <div className="mt-2 flex gap-2">
-                {userProfile?.isAdmin && (
+                {userProfile?.role === 'owner' && (
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 transition-colors">
+                    {t('profile.owner')}
+                  </span>
+                )}
+                {userProfile?.role === 'admin' && (
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 transition-colors">
                     {t('profile.admin')}
                   </span>
                 )}
-                {userProfile?.isTeamMember && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 transition-colors">
+                {userProfile?.role === 'member' && (
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 transition-colors">
                     {t('profile.teamMember')}
                   </span>
                 )}
-                {!userProfile?.isAdmin && !userProfile?.isTeamMember && (
+                {userProfile?.role === 'user' && (
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200 transition-colors">
                     {t('profile.customer')}
                   </span>

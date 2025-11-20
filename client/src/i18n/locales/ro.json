@@ -525,7 +525,7 @@
   },
   "acceptInvitation": {
     "teamInvitation": "Invitație în echipă",
-    "invitedToJoin": "Ai fost invitat să te alături echipei lui",
+    "invitedToJoin": "Ai fost invitat să te alături echipei lui {{name}}",
     "invitedBy": "Invitat de",
     "email": "Email",
     "role": "Rol",
@@ -609,6 +609,7 @@
     "nameAZ": "Nume (A-Z)",
     "nameZA": "Nume (Z-A)",
     "added": "Adăugat",
+    "hasAccount": "Are cont",
     "deleteClient": "Șterge client",
     "deleteError": "Eroare la ștergerea clientului",
     "deleteDialog": {

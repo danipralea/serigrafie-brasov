@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, hasTeamAccess } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { collection, query, getDocs, deleteDoc, doc, orderBy, updateDoc, Timestamp } from 'firebase/firestore';
 import { ChevronDownIcon } from '@heroicons/react/16/solid';
@@ -61,8 +61,8 @@ export default function Suppliers() {
   const [orderStatusFilter, setOrderStatusFilter] = useState<'active' | 'finalised'>('active');
 
   useEffect(() => {
-    // Only admins and team members can access this page
-    if (!userProfile?.isAdmin && !userProfile?.isTeamMember) {
+    // Only team members can access this page
+    if (!hasTeamAccess(userProfile)) {
       navigate('/dashboard');
       return;
     }

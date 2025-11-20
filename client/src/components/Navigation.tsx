@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, hasTeamAccess, hasAdminAccess } from '../contexts/AuthContext';
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react';
 import { GlobeAltIcon, SunIcon, MoonIcon, ComputerDesktopIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 
@@ -14,6 +14,20 @@ export default function Navigation({ variant = 'landing', onInviteTeam }: Naviga
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const { currentUser, userProfile, logout } = useAuth();
+
+  // Debug: Log user profile to console
+  console.error('🔍 ROLE DEBUG:', {
+    email: currentUser?.email,
+    role: userProfile?.role,
+    hasTeamAccess: hasTeamAccess(userProfile),
+    hasAdminAccess: hasAdminAccess(userProfile)
+  });
+
+  // Show alert once
+  if (userProfile && !window.roleAlertShown) {
+    window.roleAlertShown = true;
+    alert(`Your role: ${userProfile.role}\nhasTeamAccess: ${hasTeamAccess(userProfile)}\nhasAdminAccess: ${hasAdminAccess(userProfile)}`);
+  }
   const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'system'>(() => {
     const saved = localStorage.getItem('themeMode');
     return (saved as 'light' | 'dark' | 'system') || 'system';
@@ -93,12 +107,15 @@ export default function Navigation({ variant = 'landing', onInviteTeam }: Naviga
     <nav className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 sticky top-0 z-50 transition-colors">
       <div className="max-w-7xl mx-auto px-6 py-4">
         <div className="flex justify-between items-center">
-          <h1
-            onClick={() => navigate(currentUser ? '/dashboard' : '/')}
-            className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent cursor-pointer hover:opacity-80 transition-opacity"
-          >
-            {t('landing.title')}
-          </h1>
+          <div>
+            <h1
+              onClick={() => navigate(currentUser ? '/dashboard' : '/')}
+              className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent cursor-pointer hover:opacity-80 transition-opacity"
+            >
+              {t('landing.title')}
+            </h1>
+            <div className="text-xs text-red-500 font-mono">ROLE: {userProfile?.role || 'null'} | hasAdmin: {String(hasAdminAccess(userProfile))} | hasTeam: {String(hasTeamAccess(userProfile))}</div>
+          </div>
 
           <div className="flex items-center gap-3">
             {/* Authenticated Navigation Items */}
@@ -111,7 +128,7 @@ export default function Navigation({ variant = 'landing', onInviteTeam }: Naviga
                 >
                   {t('nav.placeOrder')}
                 </button>
-                {(userProfile?.isAdmin || userProfile?.isTeamMember) && (
+                {hasTeamAccess(userProfile) && (
                   <button
                     onClick={() => navigate('/clients')}
                     className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500 rounded-lg transition-all hover:shadow-md"
@@ -119,7 +136,7 @@ export default function Navigation({ variant = 'landing', onInviteTeam }: Naviga
                     {t('nav.clients')}
                   </button>
                 )}
-                {(userProfile?.isAdmin || userProfile?.isTeamMember) && (
+                {hasTeamAccess(userProfile) && (
                   <button
                     onClick={() => navigate('/suppliers')}
                     className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500 rounded-lg transition-all hover:shadow-md"
@@ -127,7 +144,7 @@ export default function Navigation({ variant = 'landing', onInviteTeam }: Naviga
                     {t('nav.suppliers')}
                   </button>
                 )}
-                {userProfile?.isAdmin && (
+                {hasTeamAccess(userProfile) && (
                   <button
                     onClick={() => navigate('/team')}
                     className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white border border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500 rounded-lg transition-all hover:shadow-md"
@@ -213,7 +230,7 @@ export default function Navigation({ variant = 'landing', onInviteTeam }: Naviga
 
             {/* User Menu (only for authenticated variant) */}
             {variant === 'authenticated' && currentUser && (
-              <Menu as="div" className="relative inline-block">
+              <Menu as="div" className="relative inline-block" data-testid="nav-user-menu">
                 <MenuButton className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:focus-visible:outline-blue-500">
                   <span className="sr-only">Open user menu</span>
                   {/* Profile Picture or Initials */}
@@ -247,6 +264,7 @@ export default function Navigation({ variant = 'landing', onInviteTeam }: Naviga
                     </MenuItem>
                     <MenuItem>
                       <button
+                        data-testid="nav-logout-button"
                         onClick={handleLogout}
                         className="w-full text-left block px-4 py-2 text-sm text-slate-700 data-focus:bg-slate-100 data-focus:text-slate-900 data-focus:outline-hidden dark:text-slate-300 dark:data-focus:bg-white/5 dark:data-focus:text-white"
                       >

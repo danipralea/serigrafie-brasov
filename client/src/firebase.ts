@@ -28,10 +28,10 @@ export const storage = getStorage(app);
 // - Dev mode to use production Firebase by default
 // - E2E tests to use emulators (set VITE_USE_EMULATORS=true in test environment)
 if (import.meta.env.VITE_USE_EMULATORS === 'true') {
-  connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
-  connectFirestoreEmulator(db, 'localhost', 8080);
-  connectFunctionsEmulator(functions, 'localhost', 5001);
-  connectStorageEmulator(storage, 'localhost', 9199);
+  connectAuthEmulator(auth, 'http://localhost:9109', { disableWarnings: true });
+  connectFirestoreEmulator(db, 'localhost', 8090);
+  connectFunctionsEmulator(functions, 'localhost', 5011);
+  connectStorageEmulator(storage, 'localhost', 9209);
 }
 
 // Initialize Analytics only in browser environments

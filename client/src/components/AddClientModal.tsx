@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
-import { collection, addDoc, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, Timestamp, query, where, getDocs } from 'firebase/firestore';
 
 export default function AddClientModal({ isOpen, onClose, onClientAdded }) {
   const { currentUser } = useAuth();
@@ -59,6 +59,23 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }) {
       setError('');
       setLoading(true);
 
+      // Try to find the client's Auth UID by email
+      let authUid = null;
+      if (formData.email.trim()) {
+        try {
+          const usersRef = collection(db, 'users');
+          const userQuery = query(usersRef, where('email', '==', formData.email.trim().toLowerCase()));
+          const userSnapshot = await getDocs(userQuery);
+
+          if (!userSnapshot.empty) {
+            authUid = userSnapshot.docs[0].id; // The doc ID is the Auth UID
+          }
+        } catch (err) {
+          console.error('Error looking up user by email:', err);
+          // Continue without authUid
+        }
+      }
+
       const clientsRef = collection(db, 'clients');
       await addDoc(clientsRef, {
         ...formData,
@@ -68,7 +85,9 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }) {
         company: formData.company.trim(),
         address: formData.address.trim(),
         notes: formData.notes.trim(),
-        userId: currentUser.uid,
+        authUid: authUid, // Store the client's Auth UID if found
+        userId: currentUser.uid, // Keep for backward compatibility
+        addedBy: currentUser.uid, // Track who added this client
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now()
       });
@@ -155,6 +174,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }) {
                   {t('clients.addModal.name')} <span className="text-red-500">*</span>
                 </label>
                 <input
+                  data-testid="add-client-name-input"
                   type="text"
                   id="name"
                   name="name"
@@ -172,6 +192,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }) {
                   {t('clients.addModal.email')}
                 </label>
                 <input
+                  data-testid="add-client-email-input"
                   type="email"
                   id="email"
                   name="email"
@@ -188,6 +209,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }) {
                   {t('clients.addModal.phone')}
                 </label>
                 <input
+                  data-testid="add-client-phone-input"
                   type="tel"
                   id="phone"
                   name="phone"
@@ -285,6 +307,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }) {
                   {t('clients.addModal.cancel')}
                 </button>
                 <button
+                  data-testid="add-client-submit-button"
                   type="submit"
                   disabled={loading}
                   className="flex-1 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-medium transition-opacity hover:opacity-90 disabled:opacity-50"

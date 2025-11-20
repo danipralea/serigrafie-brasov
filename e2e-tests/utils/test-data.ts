@@ -29,9 +29,9 @@ export function initializeTestFirebase() {
     testStorage = getStorage(testApp);
 
     // Connect to emulators
-    connectAuthEmulator(testAuth, 'http://localhost:9099', { disableWarnings: true });
-    connectFirestoreEmulator(testDb, 'localhost', 8080);
-    connectStorageEmulator(testStorage, 'localhost', 9199);
+    connectAuthEmulator(testAuth, 'http://localhost:9109', { disableWarnings: true });
+    connectFirestoreEmulator(testDb, 'localhost', 8090);
+    connectStorageEmulator(testStorage, 'localhost', 9209);
   }
 
   return { app: testApp, auth: testAuth, db: testDb, storage: testStorage };
@@ -41,8 +41,7 @@ export interface TestUser {
   email: string;
   password: string;
   displayName: string;
-  isAdmin?: boolean;
-  isTeamMember?: boolean;
+  role?: 'owner' | 'admin' | 'member' | 'user';
 }
 
 export const TEST_USERS = {
@@ -50,22 +49,19 @@ export const TEST_USERS = {
     email: 'admin@test.com',
     password: 'testpassword123',
     displayName: 'Test Admin',
-    isAdmin: true,
-    isTeamMember: false
+    role: 'admin' as const
   },
   teamMember: {
     email: 'team@test.com',
     password: 'testpassword123',
     displayName: 'Test Team Member',
-    isAdmin: false,
-    isTeamMember: true
+    role: 'member' as const
   },
   client: {
     email: 'client@test.com',
     password: 'testpassword123',
     displayName: 'Test Client',
-    isAdmin: false,
-    isTeamMember: false
+    role: 'user' as const
   }
 };
 
@@ -88,8 +84,7 @@ export async function createTestUser(userData: TestUser) {
       email: userData.email,
       displayName: userData.displayName,
       phoneNumber: null,
-      isAdmin: userData.isAdmin || false,
-      isTeamMember: userData.isTeamMember || false,
+      role: userData.role || 'user',
       createdAt: Timestamp.now()
     });
 

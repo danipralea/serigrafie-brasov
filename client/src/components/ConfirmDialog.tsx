@@ -85,6 +85,7 @@ export default function ConfirmDialog({
       {/* Dialog */}
       <div className={`${inline ? 'absolute' : 'fixed'} inset-0 z-50 flex items-center justify-center p-4 pointer-events-none`}>
         <div
+          data-testid="confirm-dialog"
           className={`bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-md w-full pointer-events-auto transform transition-all border-2 ${colors.border}`}
           onClick={(e) => e.stopPropagation()}
         >
@@ -120,6 +121,7 @@ export default function ConfirmDialog({
           {/* Footer with Actions */}
           <div className="bg-gray-50 dark:bg-slate-700 px-6 py-4 flex gap-3 justify-end rounded-b-lg">
             <button
+              data-testid="confirm-dialog-cancel-button"
               onClick={onClose}
               disabled={isLoading}
               className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg text-gray-700 dark:text-slate-300 font-medium hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -127,6 +129,7 @@ export default function ConfirmDialog({
               {cancelText}
             </button>
             <button
+              data-testid="confirm-dialog-confirm-button"
               onClick={handleConfirm}
               disabled={isLoading}
               className={`px-4 py-2 rounded-lg text-white font-medium transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2 ${colors.confirmBtn}`}

@@ -14,14 +14,18 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
     function isAdmin() {
       return isAuthenticated() &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+             (getUserRole() == 'admin' || getUserRole() == 'owner');
     }
 
     function isTeamMember() {
       return isAuthenticated() &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isTeamMember == true;
+             (getUserRole() == 'member' || getUserRole() == 'admin' || getUserRole() == 'owner');
     }
 
     function isAdminOrTeamMember() {
@@ -30,7 +34,7 @@ service cloud.firestore {
 
     function isTeamOwner() {
       return isAuthenticated() &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isTeamMember == false;
+             getUserRole() == 'owner';
     }
 
     function isAdminOrTeamOwner() {

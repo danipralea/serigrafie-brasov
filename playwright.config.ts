@@ -14,7 +14,7 @@ export default defineConfig({
   globalTeardown: require.resolve('./e2e-tests/global-teardown'),
 
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://localhost:5183',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -30,7 +30,7 @@ export default defineConfig({
   // Start dev server before tests
   webServer: {
     command: 'cd client && npm run dev',
-    url: 'http://localhost:5173',
+    url: 'http://localhost:5183',
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
     env: {

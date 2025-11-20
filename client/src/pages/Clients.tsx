@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, hasTeamAccess, isRegularUser as isRegularUserRole } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { collection, query, getDocs, addDoc, Timestamp, deleteDoc, doc } from 'firebase/firestore';
 import AppShell from '../components/AppShell';
@@ -27,14 +27,16 @@ export default function Clients() {
   const [sortBy, setSortBy] = useState('date-desc');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState(null);
+  const [userAccounts, setUserAccounts] = useState<Map<string, { email: string; provider: string; displayName: string; photoURL?: string; isRegularUser: boolean }>>(new Map());
 
   useEffect(() => {
-    // Only admins and team members can access this page
-    if (!userProfile?.isAdmin && !userProfile?.isTeamMember) {
+    // Only team members can access this page (owner, admin, member)
+    if (!hasTeamAccess(userProfile)) {
       navigate('/dashboard');
       return;
     }
     fetchClients();
+    fetchUserAccounts();
   }, [currentUser, userProfile, navigate]);
 
   useEffect(() => {
@@ -61,8 +63,60 @@ export default function Clients() {
     }
   }
 
+  async function fetchUserAccounts() {
+    try {
+      const usersRef = collection(db, 'users');
+      const snapshot = await getDocs(usersRef);
+      const accounts = new Map<string, { email: string; provider: string; displayName: string; photoURL?: string; isRegularUser: boolean }>();
+      snapshot.docs.forEach(doc => {
+        const data = doc.data();
+        const email = data.email;
+        if (email) {
+          const isRegularUser = data.role === 'user';
+          accounts.set(email.toLowerCase(), {
+            email: email,
+            provider: data.authProvider || 'password',
+            displayName: data.displayName || email,
+            photoURL: data.photoURL,
+            isRegularUser
+          });
+        }
+      });
+      setUserAccounts(accounts);
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.error('Error fetching user accounts:', error);
+      }
+    }
+  }
+
   function applyFiltersAndSort() {
-    let filtered = [...clients];
+    // Merge clients with regular users who don't have client records
+    let allClients = [...clients];
+
+    // Add regular users who aren't in the clients list
+    userAccounts.forEach((userData, email) => {
+      if (userData.isRegularUser) {
+        // Check if this user already exists as a client
+        const existsAsClient = clients.some(c => c.email && c.email.toLowerCase() === email);
+        if (!existsAsClient) {
+          // Create a virtual client from the user account
+          allClients.push({
+            id: `user-${email}`,
+            name: userData.displayName,
+            email: userData.email,
+            phone: null,
+            company: null,
+            address: null,
+            notes: null,
+            createdAt: { toMillis: () => Date.now() }, // We don't have the real date
+            isVirtualClient: true // Mark as virtual so we know it's from users collection
+          });
+        }
+      }
+    });
+
+    let filtered = allClients;
 
     // Apply search
     if (searchQuery) {
@@ -133,6 +187,74 @@ export default function Clients() {
     return name.substring(0, 2).toUpperCase();
   }
 
+  function clientHasAccount(client) {
+    return client.email && userAccounts.has(client.email.toLowerCase());
+  }
+
+  function getClientProvider(client) {
+    if (!client.email) return null;
+    const account = userAccounts.get(client.email.toLowerCase());
+    return account?.provider || null;
+  }
+
+  function renderProviderIcon(provider) {
+    if (!provider) return null;
+
+    if (provider === 'google.com') {
+      return (
+        <svg className="w-3 h-3" viewBox="0 0 24 24">
+          <path
+            fill="#4285F4"
+            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+          />
+          <path
+            fill="#34A853"
+            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+          />
+          <path
+            fill="#FBBC05"
+            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+          />
+          <path
+            fill="#EA4335"
+            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+          />
+        </svg>
+      );
+    }
+
+    if (provider === 'password') {
+      return (
+        <svg className="w-3 h-3 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+      );
+    }
+
+    if (provider === 'phone') {
+      return (
+        <svg className="w-3 h-3 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+        </svg>
+      );
+    }
+
+    return null;
+  }
+
+  function getProviderTooltip(provider) {
+    if (provider === 'google.com') {
+      return t('clients.hasAccount') + ' (Google)';
+    }
+    if (provider === 'password') {
+      return t('clients.hasAccount') + ' (Email)';
+    }
+    if (provider === 'phone') {
+      return t('clients.hasAccount') + ' (Phone)';
+    }
+    return t('clients.hasAccount');
+  }
+
   return (
     <AppShell title={t('clients.title')}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -151,6 +273,7 @@ export default function Clients() {
               <span className="whitespace-nowrap text-sm sm:text-base">{t('clients.inviteClient')}</span>
             </button>
             <button
+              data-testid="clients-add-client-button"
               onClick={() => setShowAddModal(true)}
               className="px-3 sm:px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-medium transition-opacity hover:opacity-90 flex items-center gap-2 focus:outline-none shrink-0"
             >
@@ -246,9 +369,19 @@ export default function Clients() {
                         {getInitials(client.name)}
                       </div>
                       <div>
-                        <h4 className="font-semibold text-slate-900 dark:text-white">
-                          {client.name}
-                        </h4>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-semibold text-slate-900 dark:text-white">
+                            {client.name}
+                          </h4>
+                          {clientHasAccount(client) && (
+                            <div
+                              className="flex items-center justify-center w-5 h-5 rounded-full bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700"
+                              title={getProviderTooltip(getClientProvider(client))}
+                            >
+                              {renderProviderIcon(getClientProvider(client))}
+                            </div>
+                          )}
+                        </div>
                         {client.company && (
                           <p className="text-xs text-slate-500 dark:text-slate-400">
                             {client.company}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, isOwner } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy, doc, getDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { TeamRole, Department } from '../types';
@@ -176,12 +176,11 @@ export default function TeamManagement() {
         removedAt: new Date()
       });
 
-      // CRITICAL: Reset the user's team member permissions
+      // CRITICAL: Reset the user's role to regular user
       if (acceptedByUserId) {
         const userRef = doc(db, 'users', acceptedByUserId);
         await updateDoc(userRef, {
-          isTeamMember: false,
-          isAdmin: false,
+          role: 'user',
           teamOwnerId: null
         });
       }
