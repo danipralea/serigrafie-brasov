@@ -10,6 +10,7 @@ interface NavigationProps {
   onInviteTeam?: () => void;
 }
 
+// Cache-bust: 2025-11-20-14-40
 export default function Navigation({ variant = 'landing', onInviteTeam }: NavigationProps) {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
