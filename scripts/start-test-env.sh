@@ -25,6 +25,12 @@ fi
 echo "✅ Prerequisites check passed"
 echo ""
 
+# Load environment variables for Functions emulator
+if [ -f "functions/.env" ]; then
+    echo "📧 Loading email configuration from functions/.env"
+    export $(cat functions/.env | grep -v '^#' | xargs)
+fi
+
 # Start Firebase emulators
 echo "🔥 Starting Firebase Emulators with PRODUCTION RULES..."
 echo "   - Firestore: http://localhost:8090"

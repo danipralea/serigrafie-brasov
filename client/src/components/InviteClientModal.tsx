@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import { sendClientInvitationEmail, createInvitationLink } from '../services/emailService';
+import { showSuccess, showError } from '../services/notificationService';
 
 export default function InviteClientModal({ isOpen, onClose }) {
   const { currentUser } = useAuth();
@@ -89,6 +90,7 @@ export default function InviteClientModal({ isOpen, onClose }) {
     } catch (err) {
       console.error('Error creating invitation:', err);
       setError(t('clients.inviteModal.errorFailed'));
+      showError(t('clients.inviteModal.errorFailed'));
     } finally {
       setLoading(false);
     }
@@ -105,6 +107,7 @@ export default function InviteClientModal({ isOpen, onClose }) {
 
   function copyToClipboard() {
     navigator.clipboard.writeText(invitationLink);
+    showSuccess(t('common.copiedToClipboard'));
   }
 
   if (!isOpen) return null;

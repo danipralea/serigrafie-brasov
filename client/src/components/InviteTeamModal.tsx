@@ -5,6 +5,7 @@ import { db } from '../firebase';
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import { sendTeamInvitationEmail, createInvitationLink } from '../services/emailService';
 import { TeamRole } from '../types';
+import { showSuccess, showError } from '../services/notificationService';
 
 export default function InviteTeamModal({ isOpen, onClose, onInvitationCreated, existingEmails = [] }) {
   const { currentUser } = useAuth();
@@ -100,6 +101,7 @@ export default function InviteTeamModal({ isOpen, onClose, onInvitationCreated, 
     } catch (err) {
       console.error('Error creating invitation:', err);
       setError(t('team.inviteModal.errorFailed'));
+      showError(t('team.inviteModal.errorFailed'));
     } finally {
       setLoading(false);
     }
@@ -116,6 +118,7 @@ export default function InviteTeamModal({ isOpen, onClose, onInvitationCreated, 
 
   function copyToClipboard() {
     navigator.clipboard.writeText(invitationLink);
+    showSuccess(t('common.copiedToClipboard'));
   }
 
   if (!isOpen) return null;

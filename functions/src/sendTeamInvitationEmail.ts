@@ -62,17 +62,35 @@ export const sendTeamInvitationEmail = functions
       );
     }
 
-    // Get secret values
-    const emailUserValue = emailUser.value();
-    const emailPassValue = emailPass.value();
+    // Get email credentials (from secrets in production, env vars in local)
+    let emailUserValue: string;
+    let emailPassValue: string;
 
-    // Check if email is configured
-    if (!emailUserValue || !emailPassValue) {
-      throw new functions.https.HttpsError(
-        "failed-precondition",
-        "Email service is not configured. " +
-        "Please set EMAIL_USER and EMAIL_PASS secrets."
-      );
+    // Check if running in emulator (local development)
+    if (process.env.FUNCTIONS_EMULATOR === "true") {
+      // Use environment variables for local development
+      emailUserValue = process.env.EMAIL_USER || "";
+      emailPassValue = process.env.EMAIL_PASS || "";
+
+      if (!emailUserValue || !emailPassValue) {
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "Email service is not configured for local development. " +
+          "Please create functions/.env file with EMAIL_USER and EMAIL_PASS."
+        );
+      }
+    } else {
+      // Use Secret Manager for production
+      emailUserValue = emailUser.value();
+      emailPassValue = emailPass.value();
+
+      if (!emailUserValue || !emailPassValue) {
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "Email service is not configured. " +
+          "Please set EMAIL_USER and EMAIL_PASS secrets."
+        );
+      }
     }
 
     // Create transporter with secret values

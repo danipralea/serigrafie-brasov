@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
-import { doc, updateDoc, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, Timestamp, collection, addDoc } from 'firebase/firestore';
 import { showSuccess, showError } from '../services/notificationService';
 
 export default function EditClientModal({ isOpen, onClose, onClientUpdated, client }) {
   const { t } = useTranslation();
+  const { currentUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -73,16 +75,38 @@ export default function EditClientModal({ isOpen, onClose, onClientUpdated, clie
       setError('');
       setLoading(true);
 
-      const clientRef = doc(db, 'clients', client.id);
-      await updateDoc(clientRef, {
-        name: formData.name.trim(),
-        email: formData.email.trim().toLowerCase(),
-        phone: formData.phone.trim(),
-        company: formData.company.trim(),
-        address: formData.address.trim(),
-        notes: formData.notes.trim(),
-        updatedAt: Timestamp.now()
-      });
+      // Check if this is a virtual client (from users collection)
+      const isVirtualClient = client.isVirtualClient || client.id.startsWith('user-');
+
+      if (isVirtualClient) {
+        // Convert virtual client to a real client record
+        // Create a new document with auto-generated ID
+        const clientsRef = collection(db, 'clients');
+        await addDoc(clientsRef, {
+          userId: currentUser.uid,
+          name: formData.name.trim(),
+          email: formData.email.trim().toLowerCase(),
+          phone: formData.phone.trim(),
+          company: formData.company.trim(),
+          address: formData.address.trim(),
+          notes: formData.notes.trim(),
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now()
+        });
+      } else {
+        // Update the existing client in clients collection
+        const clientRef = doc(db, 'clients', client.id);
+        await setDoc(clientRef, {
+          userId: currentUser.uid,
+          name: formData.name.trim(),
+          email: formData.email.trim().toLowerCase(),
+          phone: formData.phone.trim(),
+          company: formData.company.trim(),
+          address: formData.address.trim(),
+          notes: formData.notes.trim(),
+          updatedAt: Timestamp.now()
+        }, { merge: true });
+      }
 
       showSuccess(t('clients.editModal.updateSuccess'));
 
@@ -90,7 +114,8 @@ export default function EditClientModal({ isOpen, onClose, onClientUpdated, clie
         onClientUpdated();
       }
 
-      setIsEditing(false);
+      // Close the modal to allow fresh data on reopen
+      handleClose();
     } catch (err) {
       console.error('Error updating client:', err);
       setError(t('clients.editModal.errorFailed'));
