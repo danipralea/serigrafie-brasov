@@ -5,6 +5,7 @@ import { useAuth, hasTeamAccess } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy as firestoreOrderBy, doc, updateDoc, addDoc, deleteDoc, Timestamp, onSnapshot } from 'firebase/firestore';
 import { OrderStatus, ProductType } from '../types';
+import { useDepartments } from '../hooks/useDepartments';
 import InviteTeamModal from '../components/InviteTeamModal';
 import PlaceOrderModal from '../components/PlaceOrderModal';
 import Notifications from '../components/Notifications';
@@ -43,7 +44,8 @@ export default function Dashboard() {
   // Tab and filter states
   const [activeTab, setActiveTab] = useState('current'); // 'current' or 'past'
   const [statusFilter, setStatusFilter] = useState('all');
-  const [productFilter, setProductFilter] = useState('all');
+  const [departmentFilter, setDepartmentFilter] = useState('all');
+  const { departments } = useDepartments();
   const [sortBy, setSortBy] = useState('delivery-asc');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -234,10 +236,10 @@ export default function Dashboard() {
       filtered = filtered.filter(order => order.status === statusFilter);
     }
 
-    // Apply product filter - check sub-orders
-    if (productFilter !== 'all') {
+    // Apply department filter - check sub-orders
+    if (departmentFilter !== 'all') {
       filtered = filtered.filter(order =>
-        order.subOrders?.some(so => so.productType === productFilter)
+        order.subOrders?.some((so: any) => so.departmentId === departmentFilter)
       );
     }
 
@@ -323,7 +325,7 @@ export default function Dashboard() {
     }
 
     return filtered;
-  }, [orders, activeTab, statusFilter, productFilter, sortBy, searchQuery, getEarliestDeliveryTime]);
+  }, [orders, activeTab, statusFilter, departmentFilter, sortBy, searchQuery, getEarliestDeliveryTime]);
 
   function handleReorder(e, order) {
     e.stopPropagation(); // Prevent row click from opening order details
@@ -738,21 +740,18 @@ export default function Dashboard() {
               </select>
             </div>
 
-            {/* Product Filter */}
+            {/* Department Filter */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{t('dashboard.filters.product')}</label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{t('dashboard.filters.department')}</label>
               <select
-                value={productFilter}
-                onChange={(e) => setProductFilter(e.target.value)}
+                value={departmentFilter}
+                onChange={(e) => setDepartmentFilter(e.target.value)}
                 className="w-full h-10 px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
               >
-                <option value="all">{t('dashboard.filters.allProducts')}</option>
-                <option value={ProductType.MUGS}>{t('placeOrder.products.mugs')}</option>
-                <option value={ProductType.T_SHIRTS}>{t('placeOrder.products.tshirts')}</option>
-                <option value={ProductType.HOODIES}>{t('placeOrder.products.hoodies')}</option>
-                <option value={ProductType.BAGS}>{t('placeOrder.products.bags')}</option>
-                <option value={ProductType.CAPS}>{t('placeOrder.products.caps')}</option>
-                <option value={ProductType.OTHER}>{t('placeOrder.products.other')}</option>
+                <option value="all">{t('dashboard.filters.allDepartments')}</option>
+                {departments.map(dept => (
+                  <option key={dept.id} value={dept.id}>{dept.name}</option>
+                ))}
               </select>
             </div>
 

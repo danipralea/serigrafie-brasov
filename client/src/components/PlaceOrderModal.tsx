@@ -6,9 +6,10 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import { PlusIcon } from '@heroicons/react/20/solid';
 import { db } from '../firebase';
 import { collection, Timestamp, writeBatch, doc, query, where, getDocs } from 'firebase/firestore';
-import { OrderStatus, Department } from '../types';
+import { OrderStatus } from '../types';
 import ClientAutocomplete from './ClientAutocomplete';
 import SubOrderItem, { SubOrderData } from './SubOrderItem';
+import { useDepartments } from '../hooks/useDepartments';
 
 interface Client {
   id: string;
@@ -40,7 +41,7 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
   const [orderNameError, setOrderNameError] = useState('');
 
   // Departments data
-  const [departments, setDepartments] = useState<Department[]>([]);
+  const { departments } = useDepartments();
 
   // Clear errors and pre-fill phone when modal opens
   useEffect(() => {
@@ -49,46 +50,11 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
       setClientError('');
       setOrderNameError('');
 
-      // Pre-fill contact phone with user's phone number if available
       if (currentUser?.phoneNumber && !contactPhone) {
         setContactPhone(currentUser.phoneNumber);
       }
-
-      // Fetch departments for team members
-      if (hasTeamAccess(userProfile) && currentUser) {
-        fetchDepartments();
-      }
     }
   }, [open, currentUser, contactPhone, userProfile]);
-
-  async function fetchDepartments() {
-    if (!currentUser) return;
-
-    try {
-      // Determine whose departments to fetch
-      let ownerId = currentUser.uid;
-
-      // If user is not the owner, fetch team owner's departments
-      if (hasTeamAccess(userProfile) && userProfile?.teamOwnerId) {
-        ownerId = userProfile.teamOwnerId;
-      }
-
-      const departmentsRef = collection(db, 'departments');
-      const departmentsQuery = query(
-        departmentsRef,
-        where('createdBy', '==', ownerId)
-      );
-      const snapshot = await getDocs(departmentsQuery);
-      const depts = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Department));
-      setDepartments(depts);
-    } catch (error) {
-      console.error('Error fetching departments:', error);
-      // Don't show error to user, departments are optional
-    }
-  }
 
   // Scroll to top when error is set
   useEffect(() => {
@@ -102,6 +68,7 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
     {
       id: crypto.randomUUID(),
       productType: null,
+      positioning: [],
       quantity: '',
       length: '',
       width: '',
@@ -125,6 +92,7 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
       {
         id: crypto.randomUUID(),
         productType: null,
+        positioning: [],
         quantity: '',
         length: '',
         width: '',
@@ -170,6 +138,11 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
 
       if (!so.productType) {
         setError(`${t('order.subOrderItem')} #${i + 1}: ${t('order.errorProductTypeRequired')}`);
+        return false;
+      }
+
+      if (!so.positioning || so.positioning.length === 0) {
+        setError(`${t('order.subOrderItem')} #${i + 1}: ${t('order.errorPositioningRequired')}`);
         return false;
       }
 
@@ -286,6 +259,7 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
           productType: so.productType?.id || '',
           productTypeName: so.productType?.name || '',
           productTypeCustom: so.productType?.isCustom || false,
+          positioning: so.positioning || [],
           quantity: parseInt(so.quantity),
           length: so.length ? parseFloat(so.length) : null,
           width: so.width ? parseFloat(so.width) : null,

@@ -1,4 +1,4 @@
-import { useState, memo } from 'react';
+import { useState, memo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PhotoIcon, TrashIcon } from '@heroicons/react/24/solid';
 import ProductTypeAutocomplete from './ProductTypeAutocomplete';
@@ -15,6 +15,7 @@ interface ProductTypeOption {
 export interface SubOrderData {
   id: string;
   productType: ProductTypeOption | null;
+  positioning: string[];
   quantity: string;
   length: string;
   width: string;
@@ -51,6 +52,8 @@ function SubOrderItem({ subOrder, index, onChange, onRemove, canRemove, departme
   const { currentUser, userProfile } = useAuth();
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [positioningInput, setPositioningInput] = useState('');
+  const positioningInputRef = useRef<HTMLInputElement>(null);
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -141,8 +144,72 @@ function SubOrderItem({ subOrder, index, onChange, onRemove, canRemove, departme
           </div>
         )}
 
-        {/* Quantity, Length, Width, CMP in grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {/* Positioning */}
+        <div>
+          <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
+            {t('placeOrder.positioning')} *
+          </label>
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {(subOrder.positioning || []).map((pos, i) => (
+              <span
+                key={i}
+                className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 text-sm rounded-full"
+              >
+                {pos}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const updated = subOrder.positioning.filter((_, idx) => idx !== i);
+                    handleChange('positioning', updated);
+                  }}
+                  className="text-blue-600 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-100"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input
+              ref={positioningInputRef}
+              type="text"
+              value={positioningInput}
+              onChange={(e) => setPositioningInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  const val = positioningInput.trim();
+                  if (val && !(subOrder.positioning || []).includes(val)) {
+                    handleChange('positioning', [...(subOrder.positioning || []), val]);
+                    setPositioningInput('');
+                  }
+                }
+              }}
+              placeholder={t('placeOrder.positioningPlaceholder')}
+              className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-2 text-sm text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 placeholder:text-gray-400 dark:placeholder:text-slate-400 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 transition-colors"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const val = positioningInput.trim();
+                if (val && !(subOrder.positioning || []).includes(val)) {
+                  handleChange('positioning', [...(subOrder.positioning || []), val]);
+                  setPositioningInput('');
+                  positioningInputRef.current?.focus();
+                }
+              }}
+              className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors flex-shrink-0"
+            >
+              +
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">{t('placeOrder.positioningAdd')}</p>
+        </div>
+
+        {/* Quantity, Length, Width, cm², CMP in grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           <div>
             <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
               {t('placeOrder.quantity')} *
@@ -183,6 +250,20 @@ function SubOrderItem({ subOrder, index, onChange, onRemove, canRemove, departme
               step="0.01"
               placeholder="0.00"
               className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-2 text-sm text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 transition-colors"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">
+              {t('placeOrder.squareCm')}
+            </label>
+            <input
+              type="number"
+              value={subOrder.length && subOrder.width ? (parseFloat(subOrder.length) * parseFloat(subOrder.width)).toFixed(2) : ''}
+              readOnly
+              disabled
+              placeholder="-"
+              className="block w-full rounded-md bg-gray-100 dark:bg-slate-600 px-3 py-2 text-sm text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 cursor-not-allowed"
             />
           </div>
 

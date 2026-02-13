@@ -4,9 +4,10 @@ import { useTranslation } from 'react-i18next';
 import { useAuth, isOwner } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy, doc, getDoc, deleteDoc, updateDoc } from 'firebase/firestore';
-import { TeamRole, Department } from '../types';
+import { TeamRole } from '../types';
 import InviteTeamModal from '../components/InviteTeamModal';
 import AddDepartmentModal from '../components/AddDepartmentModal';
+import { useDepartments } from '../hooks/useDepartments';
 import ConfirmDialog from '../components/ConfirmDialog';
 import AppShell from '../components/AppShell';
 import { formatDate } from '../utils/dateUtils';
@@ -21,7 +22,7 @@ export default function TeamManagement() {
   const [admins, setAdmins] = useState<any[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [pendingInvitations, setPendingInvitations] = useState<any[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
+  const { departments, refetch: refetchDepartments } = useDepartments();
   const [loading, setLoading] = useState(true);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showAddDepartmentModal, setShowAddDepartmentModal] = useState(false);
@@ -34,7 +35,6 @@ export default function TeamManagement() {
 
   useEffect(() => {
     fetchTeamData();
-    fetchDepartments();
   }, [currentUser]);
 
   async function fetchTeamData() {
@@ -93,28 +93,6 @@ export default function TeamManagement() {
     }
   }
 
-  async function fetchDepartments() {
-    if (!currentUser) return;
-
-    try {
-      const departmentsRef = collection(db, 'departments');
-      const departmentsQuery = query(
-        departmentsRef,
-        where('createdBy', '==', currentUser.uid)
-      );
-      const snapshot = await getDocs(departmentsQuery);
-      const depts = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Department));
-      setDepartments(depts);
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error('Error fetching departments:', error);
-      }
-    }
-  }
-
   function promptDeleteDepartment(departmentId: string) {
     setSelectedDepartmentId(departmentId);
     setShowDeleteDepartmentDialog(true);
@@ -125,7 +103,7 @@ export default function TeamManagement() {
 
     try {
       await deleteDoc(doc(db, 'departments', selectedDepartmentId));
-      await fetchDepartments();
+      await refetchDepartments();
     } catch (error) {
       if (import.meta.env.DEV) {
         console.error('Error deleting department:', error);
@@ -549,7 +527,7 @@ export default function TeamManagement() {
       <AddDepartmentModal
         isOpen={showAddDepartmentModal}
         onClose={() => setShowAddDepartmentModal(false)}
-        onDepartmentAdded={fetchDepartments}
+        onDepartmentAdded={refetchDepartments}
         teamMembers={[
           ...owners.map(o => ({ id: o.id, email: o.email, displayName: o.displayName })),
           ...admins.map(a => ({ id: a.id, email: a.email, displayName: a.displayName })),
