@@ -866,5 +866,13 @@
       "orderInfo": "Informații comandă"
     },
     "deleteOrder": "Șterge comandă"
+  },
+  "notifications": {
+    "orderCompleted": "Comand\u0103 finalizat\u0103",
+    "orderCompletedMessage": "Comanda #{{orderId}} a fost finalizat\u0103!",
+    "orderStatusChanged": "Status comand\u0103 actualizat",
+    "orderStatusChangedMessage": "Comanda #{{orderId}} - status schimbat la: {{status}}",
+    "subOrderCompleted": "Articol finalizat",
+    "subOrderCompletedMessage": "Articolul \"{{productName}}\" din comanda #{{orderId}} ({{department}}) a fost finalizat"
   }
 }

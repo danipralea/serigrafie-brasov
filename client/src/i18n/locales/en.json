@@ -866,5 +866,13 @@
       "orderInfo": "Order Information"
     },
     "deleteOrder": "Delete Order"
+  },
+  "notifications": {
+    "orderCompleted": "Order Completed",
+    "orderCompletedMessage": "Order #{{orderId}} has been completed!",
+    "orderStatusChanged": "Order Status Updated",
+    "orderStatusChangedMessage": "Order #{{orderId}} status changed to: {{status}}",
+    "subOrderCompleted": "Item Completed",
+    "subOrderCompletedMessage": "Item \"{{productName}}\" from order #{{orderId}} ({{department}}) has been completed"
   }
 }

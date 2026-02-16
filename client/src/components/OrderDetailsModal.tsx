@@ -190,6 +190,23 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
         createdAt: Timestamp.now()
       });
 
+      if (selectedOrder.userId && selectedOrder.userId !== currentUser!.uid) {
+        const notificationsRef = collection(db, 'notifications');
+        await addDoc(notificationsRef, {
+          userId: selectedOrder.userId,
+          type: 'status_change',
+          title: newStatus === OrderStatus.COMPLETED
+            ? t('notifications.orderCompleted')
+            : t('notifications.orderStatusChanged'),
+          message: newStatus === OrderStatus.COMPLETED
+            ? t('notifications.orderCompletedMessage', { orderId: selectedOrder.id.substring(0, 8).toUpperCase() })
+            : t('notifications.orderStatusChangedMessage', { orderId: selectedOrder.id.substring(0, 8).toUpperCase(), status: getStatusLabel(newStatus) }),
+          orderId: selectedOrder.id,
+          read: false,
+          createdAt: Timestamp.now()
+        });
+      }
+
       await fetchOrderUpdates(selectedOrder.id);
       setSelectedOrder({ ...selectedOrder, status: newStatus });
       if (onOrderUpdated) onOrderUpdated();
@@ -228,6 +245,24 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
         isSystem: true,
         createdAt: Timestamp.now()
       });
+
+      if (newStatus === OrderStatus.COMPLETED && selectedOrder.userId && selectedOrder.userId !== currentUser!.uid) {
+        const sub = selectedOrder.subOrders.find((s: any) => s.id === subOrderId);
+        const notificationsRef = collection(db, 'notifications');
+        await addDoc(notificationsRef, {
+          userId: selectedOrder.userId,
+          type: 'status_change',
+          title: t('notifications.subOrderCompleted'),
+          message: t('notifications.subOrderCompletedMessage', {
+            orderId: selectedOrder.id.substring(0, 8).toUpperCase(),
+            productName: sub?.productTypeName || '',
+            department: sub?.departmentName || ''
+          }),
+          orderId: selectedOrder.id,
+          read: false,
+          createdAt: Timestamp.now()
+        });
+      }
 
       await fetchOrderUpdates(selectedOrder.id);
       if (onOrderUpdated) onOrderUpdated();
