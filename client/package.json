@@ -21,7 +21,8 @@
     "react-dom": "^19.2.0",
     "react-hot-toast": "^2.6.0",
     "react-i18next": "^16.2.1",
-    "react-router-dom": "^7.9.4"
+    "react-router-dom": "^7.9.4",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.0",

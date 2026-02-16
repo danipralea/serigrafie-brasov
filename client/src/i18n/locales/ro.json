@@ -239,6 +239,12 @@
       "orderConfirmedByClient": "Comandă confirmată de client. Gata de procesare.",
       "orderCreatedByTeam": "Comandă creată de echipă",
       "orderCreatedByClient": "Comandă creată de client",
+      "export": {
+        "exportToExcel": "Export\u0103 \u00een Excel",
+        "exportSuccess": "{{count}} comenzi exportate cu succes",
+        "exportError": "Eroare la exportarea comenzilor",
+        "noOrdersToExport": "Nicio comand\u0103 de exportat"
+      },
       "statuses": {
         "pendingConfirmation": "Așteaptă confirmare",
         "confirmed": "Confirmată",
@@ -604,6 +610,29 @@
     "generate": "Generează factură",
     "download": "Descarcă factură",
     "eFacutra": "Înregistrare E-Factura"
+  },
+  "report": {
+    "orderId": "ID Comand\u0103",
+    "orderName": "Denumire Comand\u0103",
+    "clientName": "Nume Client",
+    "clientCompany": "Companie Client",
+    "clientEmail": "Email Client",
+    "clientPhone": "Telefon Client",
+    "productType": "Tip Produs",
+    "quantity": "Cantitate",
+    "positioning": "Pozi\u021bionare",
+    "length": "Lungime (cm)",
+    "width": "L\u0103\u021bime (cm)",
+    "area": "Suprafa\u021b\u0103 (cm\u00b2)",
+    "cmp": "Cost/buc (RON)",
+    "department": "Departament",
+    "description": "Descriere",
+    "notes": "Noti\u021be",
+    "deliveryTime": "Data Livrare",
+    "designFile": "Fi\u0219ier Design",
+    "orderStatus": "Status Comand\u0103",
+    "itemStatus": "Status Articol",
+    "createdDate": "Data Cre\u0103rii"
   },
   "admin": {
     "title": "Panou administrare",

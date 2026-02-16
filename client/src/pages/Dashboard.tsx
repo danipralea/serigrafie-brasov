@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useAuth, hasTeamAccess } from '../contexts/AuthContext';
+import { useAuth, hasTeamAccess, hasAdminAccess } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy as firestoreOrderBy, doc, updateDoc, addDoc, deleteDoc, Timestamp, onSnapshot } from 'firebase/firestore';
 import { OrderStatus, ProductType } from '../types';
@@ -13,6 +13,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import AppShell from '../components/AppShell';
 import OrderDetailsModal from '../components/OrderDetailsModal';
 import { downloadInvoice, sendInvoiceToClient } from '../services/invoiceService';
+import { exportOrdersToExcel } from '../services/reportService';
 import { uploadFile } from '../services/storageService';
 import { showSuccess, showError } from '../services/notificationService';
 import { formatDate } from '../utils/dateUtils';
@@ -816,17 +817,46 @@ export default function Dashboard() {
             <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white whitespace-nowrap">
               {t(hasTeamAccess(userProfile) ? 'dashboard.table.orders' : 'dashboard.table.yourOrders')} ({filteredOrders.length})
             </h2>
-            <button
-              data-testid="dashboard-add-order-button"
-              onClick={() => setShowPlaceOrderModal(true)}
-              title={t('dashboard.addOrderTitle')}
-              className="px-3 sm:px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-medium transition-opacity hover:opacity-90 flex items-center gap-2 focus:outline-none shrink-0"
-            >
-              <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              <span className="whitespace-nowrap text-sm sm:text-base">{t('dashboard.addOrder')}</span>
-            </button>
+            <div className="flex items-center gap-2">
+              {hasAdminAccess(userProfile) && (
+                <button
+                  onClick={() => {
+                    if (filteredOrders.length === 0) {
+                      showError(t('dashboard.orderModal.export.noOrdersToExport'));
+                      return;
+                    }
+                    try {
+                      exportOrdersToExcel(filteredOrders, t);
+                      showSuccess(t('dashboard.orderModal.export.exportSuccess', { count: filteredOrders.length }));
+                    } catch (error) {
+                      showError(t('dashboard.orderModal.export.exportError'));
+                    }
+                  }}
+                  disabled={filteredOrders.length === 0}
+                  title={t('dashboard.orderModal.export.exportToExcel')}
+                  className="px-3 sm:px-4 py-2 rounded-lg bg-green-600 text-white font-medium text-sm hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2 focus:outline-none shrink-0"
+                >
+                  <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span className="hidden sm:inline whitespace-nowrap">{t('dashboard.orderModal.export.exportToExcel')}</span>
+                  {filteredOrders.length > 0 && (
+                    <span className="bg-green-500 text-white text-xs px-1.5 py-0.5 rounded-full">{filteredOrders.length}</span>
+                  )}
+                </button>
+              )}
+              <button
+                data-testid="dashboard-add-order-button"
+                onClick={() => setShowPlaceOrderModal(true)}
+                title={t('dashboard.addOrderTitle')}
+                className="px-3 sm:px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-medium transition-opacity hover:opacity-90 flex items-center gap-2 focus:outline-none shrink-0"
+              >
+                <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                <span className="whitespace-nowrap text-sm sm:text-base">{t('dashboard.addOrder')}</span>
+              </button>
+            </div>
           </div>
 
           {loading ? (

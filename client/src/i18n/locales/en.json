@@ -282,6 +282,12 @@
       "orderConfirmedByClient": "Order confirmed by client. Ready for processing.",
       "orderCreatedByTeam": "Order created by team",
       "orderCreatedByClient": "Order created by client",
+      "export": {
+        "exportToExcel": "Export to Excel",
+        "exportSuccess": "Exported {{count}} orders successfully",
+        "exportError": "Failed to export orders",
+        "noOrdersToExport": "No orders to export"
+      },
       "statuses": {
         "pendingConfirmation": "Waiting Confirmation",
         "confirmed": "Confirmed",
@@ -604,6 +610,29 @@
     "generate": "Generate Invoice",
     "download": "Download Invoice",
     "eFacutra": "E-Factura Registration"
+  },
+  "report": {
+    "orderId": "Order ID",
+    "orderName": "Order Name",
+    "clientName": "Client Name",
+    "clientCompany": "Client Company",
+    "clientEmail": "Client Email",
+    "clientPhone": "Client Phone",
+    "productType": "Product Type",
+    "quantity": "Quantity",
+    "positioning": "Positioning",
+    "length": "Length (cm)",
+    "width": "Width (cm)",
+    "area": "Area (cm\u00b2)",
+    "cmp": "Cost/unit (RON)",
+    "department": "Department",
+    "description": "Description",
+    "notes": "Notes",
+    "deliveryTime": "Delivery Time",
+    "designFile": "Design File",
+    "orderStatus": "Order Status",
+    "itemStatus": "Item Status",
+    "createdDate": "Created Date"
   },
   "admin": {
     "title": "Admin Panel",
