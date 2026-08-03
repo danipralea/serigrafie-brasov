@@ -6,6 +6,7 @@ export const OrderStatus = {
   PENDING: 'pending',
   IN_PROGRESS: 'in_progress',
   COMPLETED: 'completed',
+  DELIVERED: 'delivered',
   CANCELLED: 'cancelled'
 } as const;
 

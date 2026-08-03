@@ -5,6 +5,7 @@ import { useAuth, hasTeamAccess } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, onSnapshot, Timestamp, doc, getDoc } from 'firebase/firestore';
 import { OrderStatus, ProductType } from '../types';
+import { getOrderClientPrimaryName } from '../utils/clientDisplay';
 import AppShell from '../components/AppShell';
 import OrderDetailsModal from '../components/OrderDetailsModal';
 import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
@@ -24,6 +25,7 @@ const STATUS_COLORS: { [key: string]: string } = {
   [OrderStatus.PENDING]: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800',
   [OrderStatus.IN_PROGRESS]: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800',
   [OrderStatus.COMPLETED]: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800',
+  [OrderStatus.DELIVERED]: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800',
   [OrderStatus.CANCELLED]: 'bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-400 border-gray-200 dark:border-gray-800',
 };
 
@@ -273,6 +275,7 @@ export default function Calendar() {
                   <option value={OrderStatus.PENDING}>{t('calendar.statusPending')}</option>
                   <option value={OrderStatus.IN_PROGRESS}>{t('calendar.statusInProgress')}</option>
                   <option value={OrderStatus.COMPLETED}>{t('calendar.statusCompleted')}</option>
+                  <option value={OrderStatus.DELIVERED}>{t('calendar.statusDelivered')}</option>
                   <option value={OrderStatus.CANCELLED}>{t('calendar.statusCancelled')}</option>
                 </select>
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
@@ -404,9 +407,9 @@ export default function Calendar() {
                             <div className="font-medium text-gray-900 dark:text-gray-100 truncate mb-1">
                               {subOrder.productTypeName || subOrder.productType} ({subOrder.quantity})
                             </div>
-                            {subOrder.clientName && (
+                            {getOrderClientPrimaryName(subOrder) && (
                               <div className="text-[10px] text-gray-600 dark:text-gray-400 truncate mb-1">
-                                {subOrder.clientName}
+                                {getOrderClientPrimaryName(subOrder)}
                               </div>
                             )}
                             <div className="flex items-center justify-between">

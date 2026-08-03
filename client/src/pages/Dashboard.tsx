@@ -5,6 +5,8 @@ import { useAuth, hasTeamAccess, hasAdminAccess } from '../contexts/AuthContext'
 import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy as firestoreOrderBy, doc, updateDoc, addDoc, deleteDoc, Timestamp, onSnapshot } from 'firebase/firestore';
 import { OrderStatus, ProductType } from '../types';
+import { formatPositioning, normalizePositioning } from '../utils/positioning';
+import { getOrderClientPrimaryName, getOrderClientSecondaryName } from '../utils/clientDisplay';
 import { useDepartments } from '../hooks/useDepartments';
 import InviteTeamModal from '../components/InviteTeamModal';
 import PlaceOrderModal from '../components/PlaceOrderModal';
@@ -225,9 +227,10 @@ export default function Dashboard() {
         order.status === OrderStatus.IN_PROGRESS
       );
     } else {
-      // Past orders: completed, cancelled
+      // Past orders: completed, delivered, cancelled
       filtered = filtered.filter(order =>
         order.status === OrderStatus.COMPLETED ||
+        order.status === OrderStatus.DELIVERED ||
         order.status === OrderStatus.CANCELLED
       );
     }
@@ -265,9 +268,7 @@ export default function Dashboard() {
           so.productType?.toLowerCase().includes(query) ||
           so.productTypeName?.toLowerCase().includes(query) ||
           so.quantity?.toString().includes(query) ||
-          so.length?.toString().includes(query) ||
-          so.width?.toString().includes(query) ||
-          so.cmp?.toString().includes(query) ||
+          formatPositioning(normalizePositioning(so.positioning, so)).toLowerCase().includes(query) ||
           so.description?.toLowerCase().includes(query) ||
           so.designFile?.toLowerCase().includes(query) ||
           so.notes?.toLowerCase().includes(query) ||
@@ -629,6 +630,8 @@ export default function Dashboard() {
         return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300';
       case OrderStatus.COMPLETED:
         return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300';
+      case OrderStatus.DELIVERED:
+        return 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300';
       case OrderStatus.CANCELLED:
         return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300';
       default:
@@ -646,6 +649,8 @@ export default function Dashboard() {
         return t('dashboard.orderModal.statuses.inProduction');
       case OrderStatus.COMPLETED:
         return t('dashboard.orderModal.statuses.completed');
+      case OrderStatus.DELIVERED:
+        return t('dashboard.orderModal.statuses.delivered');
       case OrderStatus.CANCELLED:
         return t('dashboard.orderModal.statuses.cancelled');
       default:
@@ -737,6 +742,7 @@ export default function Dashboard() {
                 <option value={OrderStatus.PENDING}>{getStatusLabel(OrderStatus.PENDING)}</option>
                 <option value={OrderStatus.IN_PROGRESS}>{getStatusLabel(OrderStatus.IN_PROGRESS)}</option>
                 <option value={OrderStatus.COMPLETED}>{getStatusLabel(OrderStatus.COMPLETED)}</option>
+                <option value={OrderStatus.DELIVERED}>{getStatusLabel(OrderStatus.DELIVERED)}</option>
                 <option value={OrderStatus.CANCELLED}>{getStatusLabel(OrderStatus.CANCELLED)}</option>
               </select>
             </div>
@@ -939,9 +945,9 @@ export default function Dashboard() {
                         className="hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors"
                       >
                         <td className="px-6 py-4 text-sm">
-                          <div className="font-medium text-slate-900 dark:text-white">{order.clientName || '-'}</div>
-                          {order.clientCompany && (
-                            <div className="text-xs text-slate-500 dark:text-slate-400">{order.clientCompany}</div>
+                          <div className="font-medium text-slate-900 dark:text-white">{getOrderClientPrimaryName(order) || '-'}</div>
+                          {getOrderClientSecondaryName(order) && (
+                            <div className="text-xs text-slate-500 dark:text-slate-400">{getOrderClientSecondaryName(order)}</div>
                           )}
                         </td>
                         <td className="px-6 py-4 text-sm">

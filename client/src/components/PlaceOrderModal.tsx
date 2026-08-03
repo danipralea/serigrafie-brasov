@@ -10,6 +10,8 @@ import { OrderStatus } from '../types';
 import ClientAutocomplete from './ClientAutocomplete';
 import SubOrderItem, { SubOrderData } from './SubOrderItem';
 import { useDepartments } from '../hooks/useDepartments';
+import { toStoredPositioning } from '../utils/positioning';
+import { getClientPrimaryName, getClientSecondaryName } from '../utils/clientDisplay';
 
 interface Client {
   id: string;
@@ -70,9 +72,6 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
       productType: null,
       positioning: [],
       quantity: '',
-      length: '',
-      width: '',
-      cmp: '',
       description: '',
       designFile: '',
       deliveryTime: '',
@@ -94,9 +93,6 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
         productType: null,
         positioning: [],
         quantity: '',
-        length: '',
-        width: '',
-        cmp: '',
         description: '',
         designFile: '',
         deliveryTime: '',
@@ -259,11 +255,8 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
           productType: so.productType?.id || '',
           productTypeName: so.productType?.name || '',
           productTypeCustom: so.productType?.isCustom || false,
-          positioning: so.positioning || [],
+          positioning: toStoredPositioning(so.positioning),
           quantity: parseInt(so.quantity),
-          length: so.length ? parseFloat(so.length) : null,
-          width: so.width ? parseFloat(so.width) : null,
-          cmp: so.cmp ? parseFloat(so.cmp) : null,
           description: so.description,
           designFile: so.designFile || '',
           designFilePath: so.designFilePath || '',
@@ -303,10 +296,8 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
         {
           id: crypto.randomUUID(),
           productType: null,
+          positioning: [],
           quantity: '',
-          length: '',
-          width: '',
-          cmp: '',
           description: '',
           designFile: '',
           deliveryTime: '',
@@ -431,8 +422,10 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
                         <XMarkIcon className="h-4 w-4" />
                       </button>
                       <div className="text-sm text-blue-900 dark:text-blue-200 pr-6">
-                        <strong>{selectedClient.name}</strong>
-                        {selectedClient.company && <span className="ml-2">• {selectedClient.company}</span>}
+                        <strong>{getClientPrimaryName(selectedClient)}</strong>
+                        {getClientSecondaryName(selectedClient) && (
+                          <span className="ml-2">• {getClientSecondaryName(selectedClient)}</span>
+                        )}
                         {selectedClient.email && (
                           <div className="mt-1 text-blue-700 dark:text-blue-300">
                             {selectedClient.email}

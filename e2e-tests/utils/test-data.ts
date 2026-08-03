@@ -160,9 +160,9 @@ export async function seedTestData() {
     productTypeName: 'Mugs',
     productTypeCustom: false,
     quantity: 100,
-    length: null,
-    width: null,
-    cmp: null,
+    positioning: [
+      { name: 'față', quantity: 100, length: 10, width: 8, cmp: 5 }
+    ],
     description: 'White ceramic mugs with logo',
     designFile: '',
     designFilePath: '',

@@ -132,6 +132,7 @@
     "statusPending": "Confirmat",
     "statusInProgress": "În producție",
     "statusCompleted": "Finalizat",
+    "statusDelivered": "Predat",
     "statusCancelled": "Anulat",
     "mon": "Lun",
     "tue": "Mar",
@@ -250,6 +251,7 @@
         "confirmed": "Confirmată",
         "inProduction": "În producție",
         "completed": "Finalizată",
+        "delivered": "Predată",
         "cancelled": "Anulată"
       }
     }
@@ -291,6 +293,7 @@
     "pending": "în așteptare",
     "in_progress": "în lucru",
     "completed": "finalizat",
+    "delivered": "predat",
     "cancelled": "anulat"
   },
   "productType": {
@@ -330,6 +333,12 @@
     "squareCm": "Suprafață (cm²)",
     "cmp": "Cost/buc (RON)",
     "cmpPlaceholder": "ex. 15.99",
+    "productQuantity": "Cantitate produse",
+    "positionDetails": "Detalii pe poziție",
+    "positioningEmpty": "Nicio poziție adăugată încă",
+    "removePosition": "Șterge poziția",
+    "positionCost": "Cost poziție (RON)",
+    "totalCost": "Cost total (RON)",
     "description": "Descriere",
     "descriptionPlaceholder": "Descrieți ce doriți să fie imprimat (culori, text, imagini, etc.)",
     "descriptionHelp": "Descrieți designul, culorile, textul sau imaginile pe care doriți să le imprimați.",
@@ -625,6 +634,7 @@
     "width": "L\u0103\u021bime (cm)",
     "area": "Suprafa\u021b\u0103 (cm\u00b2)",
     "cmp": "Cost/buc (RON)",
+    "positionCost": "Cost Pozi\u021bie (RON)",
     "department": "Departament",
     "description": "Descriere",
     "notes": "Noti\u021be",

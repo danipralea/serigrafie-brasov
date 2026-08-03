@@ -9,7 +9,18 @@ import { downloadInvoice, sendInvoiceToClient } from '../services/invoiceService
 import { uploadFile } from '../services/storageService';
 import { showSuccess, showError } from '../services/notificationService';
 import ConfirmDialog from './ConfirmDialog';
+import PositioningEditor from './PositioningEditor';
 import { formatDate } from '../utils/dateUtils';
+import {
+  formatPositioning,
+  getPositionArea,
+  getPositionCost,
+  getPositioningTotalCost,
+  normalizePositioning,
+  toPositionFormEntries,
+  toStoredPositioning
+} from '../utils/positioning';
+import { getOrderClientPrimaryName, getOrderClientSecondaryName } from '../utils/clientDisplay';
 
 interface OrderDetailsModalProps {
   isOpen: boolean;
@@ -159,11 +170,11 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
   async function updateOrderStatus(newStatus: string) {
     if (!selectedOrder) return;
 
-    // Check if trying to complete order
-    if (newStatus === OrderStatus.COMPLETED) {
+    // Check if trying to complete or hand over the order
+    if (newStatus === OrderStatus.COMPLETED || newStatus === OrderStatus.DELIVERED) {
       // Check if all sub-orders are completed
-      const incompleteSubOrders = selectedOrder.subOrders.filter((subOrder: any) =>
-        subOrder.status !== OrderStatus.COMPLETED
+      const incompleteSubOrders = (selectedOrder.subOrders || []).filter((subOrder: any) =>
+        subOrder.status !== OrderStatus.COMPLETED && subOrder.status !== OrderStatus.DELIVERED
       );
 
       if (incompleteSubOrders.length > 0) {
@@ -392,13 +403,10 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
       (selectedOrder.subOrders || []).map((so: any) => ({
         id: so.id,
         productTypeName: so.productTypeName || so.productType || '',
-        positioning: so.positioning || [],
+        positioning: toPositionFormEntries(so.positioning, so),
         quantity: so.quantity || 0,
         departmentId: so.departmentId || '',
         departmentName: so.departmentName || '',
-        length: so.length || '',
-        width: so.width || '',
-        cmp: so.cmp || '',
         description: so.description || '',
         notes: so.notes || '',
         deliveryTime: so.deliveryTime || '',
@@ -446,13 +454,9 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
       const subChanges: any = {};
       const subFields = [
         { key: 'productTypeName', label: t('placeOrder.productType') },
-        { key: 'positioning', label: t('placeOrder.positioning') },
-        { key: 'quantity', label: t('placeOrder.quantity') },
+        { key: 'quantity', label: t('placeOrder.productQuantity') },
         { key: 'departmentId', label: t('order.department') + ' ID' },
         { key: 'departmentName', label: t('order.department') },
-        { key: 'length', label: t('placeOrder.length') },
-        { key: 'width', label: t('placeOrder.width') },
-        { key: 'cmp', label: t('placeOrder.cmp') },
         { key: 'description', label: t('placeOrder.description') },
         { key: 'notes', label: t('placeOrder.notes') },
         { key: 'deliveryTime', label: t('placeOrder.deliveryTime') },
@@ -472,6 +476,20 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
           }
           subChanges[f.key] = f.key === 'quantity' ? Number(edited[f.key]) || 0 : edited[f.key];
         }
+      }
+
+      // Positioning is an array of objects, so it is diffed on its readable form
+      const origPositions = normalizePositioning(orig.positioning, orig);
+      const editedPositions = toStoredPositioning(edited.positioning || []);
+      const origPositionsText = formatPositioning(origPositions);
+      const editedPositionsText = formatPositioning(editedPositions);
+      if (origPositionsText !== editedPositionsText) {
+        changes.push({
+          field: `${t('order.subOrderItem')} #${i + 1} ${t('placeOrder.positioning')}`,
+          oldValue: origPositionsText,
+          newValue: editedPositionsText,
+        });
+        subChanges.positioning = editedPositions;
       }
 
       if (Object.keys(subChanges).length > 0) {
@@ -605,11 +623,12 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
 
   function getStatusColor(status: string) {
     const colors: { [key: string]: string } = {
-      'pending-confirmation': 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300',
-      'pending': 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
-      'in-progress': 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300',
-      'completed': 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
-      'cancelled': 'bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-300'
+      [OrderStatus.PENDING_CONFIRMATION]: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300',
+      [OrderStatus.PENDING]: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
+      [OrderStatus.IN_PROGRESS]: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300',
+      [OrderStatus.COMPLETED]: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
+      [OrderStatus.DELIVERED]: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300',
+      [OrderStatus.CANCELLED]: 'bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-300'
     };
     return colors[status] || 'bg-gray-100 text-gray-700';
   }
@@ -768,9 +787,9 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                 ) : (
                   <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                     <div className="text-sm space-y-1">
-                      <div className="font-semibold text-blue-900 dark:text-blue-200">{selectedOrder.clientName}</div>
-                      {selectedOrder.clientCompany && (
-                        <div className="text-blue-800 dark:text-blue-300">{selectedOrder.clientCompany}</div>
+                      <div className="font-semibold text-blue-900 dark:text-blue-200">{getOrderClientPrimaryName(selectedOrder)}</div>
+                      {getOrderClientSecondaryName(selectedOrder) && (
+                        <div className="text-blue-800 dark:text-blue-300">{getOrderClientSecondaryName(selectedOrder)}</div>
                       )}
                       {selectedOrder.clientEmail && (
                         <div className="text-blue-700 dark:text-blue-400">{selectedOrder.clientEmail}</div>
@@ -831,44 +850,15 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                             </div>
                             <div>
                               <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">{t('placeOrder.positioning')}</label>
-                              <div className="flex flex-wrap gap-1.5 mb-2">
-                                {(editSub.positioning || []).map((pos: string, pi: number) => (
-                                  <span key={pi} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 text-xs rounded-full">
-                                    {pos}
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const updated = editSub.positioning.filter((_: string, idx: number) => idx !== pi);
-                                        updateEditSub({ positioning: updated });
-                                      }}
-                                      className="text-blue-600 dark:text-blue-300 hover:text-blue-900"
-                                    >
-                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                      </svg>
-                                    </button>
-                                  </span>
-                                ))}
-                              </div>
-                              <input
-                                type="text"
-                                placeholder={t('placeOrder.positioningPlaceholder')}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    const val = (e.target as HTMLInputElement).value.trim();
-                                    if (val && !(editSub.positioning || []).includes(val)) {
-                                      updateEditSub({ positioning: [...(editSub.positioning || []), val] });
-                                      (e.target as HTMLInputElement).value = '';
-                                    }
-                                  }
-                                }}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                              <PositioningEditor
+                                positions={editSub.positioning || []}
+                                onChange={(positions) => updateEditSub({ positioning: positions })}
+                                testIdPrefix={`edit-sub-order-${index}`}
                               />
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                               <div>
-                                <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">{t('placeOrder.quantity')}</label>
+                                <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">{t('placeOrder.productQuantity')}</label>
                                 <input
                                   type="number"
                                   value={editSub.quantity}
@@ -891,46 +881,6 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                                     <option key={dept.id} value={dept.id}>{dept.name}</option>
                                   ))}
                                 </select>
-                              </div>
-                            </div>
-                            <div className="grid grid-cols-4 gap-3">
-                              <div>
-                                <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">{t('placeOrder.length')}</label>
-                                <input
-                                  type="number"
-                                  value={editSub.length}
-                                  onChange={(e) => updateEditSub({ length: e.target.value })}
-                                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">{t('placeOrder.width')}</label>
-                                <input
-                                  type="number"
-                                  value={editSub.width}
-                                  onChange={(e) => updateEditSub({ width: e.target.value })}
-                                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">{t('placeOrder.squareCm')}</label>
-                                <input
-                                  type="number"
-                                  value={editSub.length && editSub.width ? (parseFloat(editSub.length) * parseFloat(editSub.width)).toFixed(2) : ''}
-                                  readOnly
-                                  disabled
-                                  placeholder="-"
-                                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 bg-gray-100 dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg text-sm cursor-not-allowed"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-gray-600 dark:text-slate-400 mb-1">{t('placeOrder.cmp')}</label>
-                                <input
-                                  type="number"
-                                  value={editSub.cmp}
-                                  onChange={(e) => updateEditSub({ cmp: e.target.value })}
-                                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                />
                               </div>
                             </div>
                             <div>
@@ -977,20 +927,8 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                               <span className="text-gray-600 dark:text-slate-400">{t('placeOrder.productType')}:</span>
                               <span className="text-gray-900 dark:text-white font-medium">{subOrder.productTypeName || subOrder.productType}</span>
                             </div>
-                            {subOrder.positioning && subOrder.positioning.length > 0 && (
-                              <div className="flex justify-between items-start">
-                                <span className="text-gray-600 dark:text-slate-400">{t('placeOrder.positioning')}:</span>
-                                <div className="flex flex-wrap gap-1 justify-end">
-                                  {subOrder.positioning.map((pos: string, pi: number) => (
-                                    <span key={pi} className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 text-xs rounded-full">
-                                      {pos}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
                             <div className="flex justify-between">
-                              <span className="text-gray-600 dark:text-slate-400">{t('placeOrder.quantity')}:</span>
+                              <span className="text-gray-600 dark:text-slate-400">{t('placeOrder.productQuantity')}:</span>
                               <span className="text-gray-900 dark:text-white font-medium">{subOrder.quantity}</span>
                             </div>
                             {subOrder.departmentName && (
@@ -1002,14 +940,54 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                                 </span>
                               </div>
                             )}
-                            {(subOrder.length || subOrder.width || subOrder.cmp) && (
-                              <div className="flex justify-between">
-                                <span className="text-gray-600 dark:text-slate-400">{t('placeOrder.length')} / {t('placeOrder.width')} / {t('placeOrder.squareCm')} / {t('placeOrder.cmp')}:</span>
-                                <span className="text-gray-900 dark:text-white">
-                                  {subOrder.length || '-'} / {subOrder.width || '-'} / {subOrder.length && subOrder.width ? (parseFloat(subOrder.length) * parseFloat(subOrder.width)).toFixed(2) : '-'} / {subOrder.cmp || '-'}
-                                </span>
-                              </div>
-                            )}
+                            {(() => {
+                              const positions = normalizePositioning(subOrder.positioning, subOrder);
+                              if (positions.length === 0) return null;
+                              const totalCost = getPositioningTotalCost(positions);
+
+                              return (
+                                <div className="pt-2 border-t border-gray-200 dark:border-slate-600">
+                                  <span className="text-gray-600 dark:text-slate-400">{t('placeOrder.positioning')}:</span>
+                                  <div className="mt-2 space-y-2">
+                                    {positions.map((pos, pi) => {
+                                      const area = getPositionArea(pos);
+                                      const cost = getPositionCost(pos);
+
+                                      return (
+                                        <div
+                                          key={pi}
+                                          className="rounded-md bg-white dark:bg-slate-600 border border-gray-200 dark:border-slate-500 px-3 py-2"
+                                        >
+                                          <div className="flex items-center justify-between gap-2">
+                                            <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 text-xs rounded-full">
+                                              {pos.name}
+                                            </span>
+                                            {cost !== null && (
+                                              <span className="text-xs font-semibold text-gray-900 dark:text-white">
+                                                {cost.toFixed(2)} RON
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="mt-1.5 grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-1 text-xs text-gray-600 dark:text-slate-300">
+                                            <span>{t('placeOrder.quantity')}: <span className="text-gray-900 dark:text-white">{pos.quantity ?? '-'}</span></span>
+                                            <span>{t('placeOrder.length')}: <span className="text-gray-900 dark:text-white">{pos.length ?? '-'}</span></span>
+                                            <span>{t('placeOrder.width')}: <span className="text-gray-900 dark:text-white">{pos.width ?? '-'}</span></span>
+                                            <span>{t('placeOrder.squareCm')}: <span className="text-gray-900 dark:text-white">{area === null ? '-' : area.toFixed(2)}</span></span>
+                                            <span>{t('placeOrder.cmp')}: <span className="text-gray-900 dark:text-white">{pos.cmp ?? '-'}</span></span>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                  {totalCost !== null && (
+                                    <div className="flex justify-between mt-2">
+                                      <span className="text-gray-600 dark:text-slate-400">{t('placeOrder.totalCost')}:</span>
+                                      <span className="text-gray-900 dark:text-white font-semibold">{totalCost.toFixed(2)}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
                             {subOrder.deliveryTime && (
                               <div className="flex justify-between">
                                 <span className="text-gray-600 dark:text-slate-400">{t('placeOrder.deliveryTime')}:</span>
@@ -1084,7 +1062,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
             )}
 
             {/* Invoice Section */}
-            {selectedOrder.status === OrderStatus.COMPLETED && (
+            {(selectedOrder.status === OrderStatus.COMPLETED || selectedOrder.status === OrderStatus.DELIVERED) && (
               <div className="mb-6 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
                 <div className="flex items-start space-x-3">
                   <svg className="w-6 h-6 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

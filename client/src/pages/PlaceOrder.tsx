@@ -10,6 +10,7 @@ import AuthModal from '../components/AuthModal';
 import AppShell from '../components/AppShell';
 import Navigation from '../components/Navigation';
 import SubOrderItem, { SubOrderData } from '../components/SubOrderItem';
+import { toStoredPositioning } from '../utils/positioning';
 import { PlusIcon } from '@heroicons/react/20/solid';
 
 export default function PlaceOrder() {
@@ -28,10 +29,8 @@ export default function PlaceOrder() {
     {
       id: crypto.randomUUID(),
       productType: null,
+      positioning: [],
       quantity: '',
-      length: '',
-      width: '',
-      cmp: '',
       description: '',
       designFile: '',
       deliveryTime: '',
@@ -85,10 +84,8 @@ export default function PlaceOrder() {
           productType: so.productType?.id || '',
           productTypeName: so.productType?.name || '',
           productTypeCustom: so.productType?.isCustom || false,
+          positioning: toStoredPositioning(so.positioning),
           quantity: parseInt(so.quantity),
-          length: so.length ? parseFloat(so.length) : null,
-          width: so.width ? parseFloat(so.width) : null,
-          cmp: so.cmp ? parseFloat(so.cmp) : null,
           description: so.description,
           designFile: so.designFile || '',
           designFilePath: so.designFilePath || '',
@@ -176,10 +173,8 @@ export default function PlaceOrder() {
       {
         id: crypto.randomUUID(),
         productType: null,
+        positioning: [],
         quantity: '',
-        length: '',
-        width: '',
-        cmp: '',
         description: '',
         designFile: '',
         deliveryTime: '',
@@ -205,6 +200,11 @@ export default function PlaceOrder() {
 
       if (!so.productType) {
         setError(`${t('order.subOrderItem')} #${i + 1}: ${t('order.errorProductTypeRequired')}`);
+        return false;
+      }
+
+      if (!so.positioning || so.positioning.length === 0) {
+        setError(`${t('order.subOrderItem')} #${i + 1}: ${t('order.errorPositioningRequired')}`);
         return false;
       }
 

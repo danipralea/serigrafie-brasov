@@ -1,13 +1,12 @@
 import * as XLSX from 'xlsx';
 import { formatDate } from '../utils/dateUtils';
+import { getPositionArea, getPositionCost, normalizePositioning } from '../utils/positioning';
 
 export function exportOrdersToExcel(orders: any[], t: (key: string, options?: any) => string): void {
+  // One row per customisation position, so quantities, sizes and costs stay
+  // readable per position. Items without positions still get a single row.
   const rows = orders.flatMap(order =>
-    (order.subOrders || []).map((sub: any) => {
-      const length = parseFloat(sub.length) || 0;
-      const width = parseFloat(sub.width) || 0;
-      const area = length && width ? Math.round(length * width * 100) / 100 : '';
-
+    (order.subOrders || []).flatMap((sub: any) => {
       const createdDate = order.createdAt?.toDate ? order.createdAt.toDate() : null;
 
       let deliveryFormatted = '';
@@ -16,20 +15,18 @@ export function exportOrdersToExcel(orders: any[], t: (key: string, options?: an
         deliveryFormatted = `${formatDate(dt)} ${dt.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}`;
       }
 
-      return {
+      const baseRow = {
         [t('report.orderId')]: order.id.substring(0, 8).toUpperCase(),
         [t('report.orderName')]: order.orderName || '',
-        [t('report.clientName')]: order.clientName || '',
         [t('report.clientCompany')]: order.clientCompany || '',
+        [t('report.clientName')]: order.clientName || '',
         [t('report.clientEmail')]: order.clientEmail || '',
         [t('report.clientPhone')]: order.clientPhone || order.contactPhone || '',
         [t('report.productType')]: sub.productTypeName || sub.productType || '',
         [t('report.quantity')]: sub.quantity || 0,
-        [t('report.positioning')]: Array.isArray(sub.positioning) ? sub.positioning.join(', ') : (sub.positioning || ''),
-        [t('report.length')]: length || '',
-        [t('report.width')]: width || '',
-        [t('report.area')]: area,
-        [t('report.cmp')]: sub.cmp || '',
+      };
+
+      const tailRow = {
         [t('report.department')]: sub.departmentName || '',
         [t('report.description')]: sub.description || '',
         [t('report.notes')]: sub.notes || order.notes || '',
@@ -39,6 +36,38 @@ export function exportOrdersToExcel(orders: any[], t: (key: string, options?: an
         [t('report.itemStatus')]: getStatusTranslation(sub.status || order.status, t),
         [t('report.createdDate')]: createdDate ? `${formatDate(createdDate)} ${createdDate.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}` : '',
       };
+
+      const positions = normalizePositioning(sub.positioning, sub);
+
+      if (positions.length === 0) {
+        return [{
+          ...baseRow,
+          [t('report.positioning')]: '',
+          [t('report.length')]: '',
+          [t('report.width')]: '',
+          [t('report.area')]: '',
+          [t('report.cmp')]: '',
+          [t('report.positionCost')]: '',
+          ...tailRow,
+        }];
+      }
+
+      return positions.map(pos => {
+        const area = getPositionArea(pos);
+        const cost = getPositionCost(pos);
+
+        return {
+          ...baseRow,
+          [t('report.positioning')]: pos.name,
+          [t('report.quantity')]: pos.quantity ?? sub.quantity ?? 0,
+          [t('report.length')]: pos.length ?? '',
+          [t('report.width')]: pos.width ?? '',
+          [t('report.area')]: area ?? '',
+          [t('report.cmp')]: pos.cmp ?? '',
+          [t('report.positionCost')]: cost ?? '',
+          ...tailRow,
+        };
+      });
     })
   );
 
@@ -49,8 +78,8 @@ export function exportOrdersToExcel(orders: any[], t: (key: string, options?: an
   const colWidths = [
     { wch: 10 },  // Order ID
     { wch: 25 },  // Order Name
-    { wch: 20 },  // Client Name
     { wch: 20 },  // Client Company
+    { wch: 20 },  // Client Name
     { wch: 25 },  // Client Email
     { wch: 15 },  // Client Phone
     { wch: 18 },  // Product Type
@@ -59,7 +88,8 @@ export function exportOrdersToExcel(orders: any[], t: (key: string, options?: an
     { wch: 10 },  // Length
     { wch: 10 },  // Width
     { wch: 10 },  // Area
-    { wch: 10 },  // CMP
+    { wch: 12 },  // Cost/unit
+    { wch: 14 },  // Position cost
     { wch: 15 },  // Department
     { wch: 30 },  // Description
     { wch: 25 },  // Notes
@@ -91,6 +121,8 @@ function getStatusTranslation(status: string, t: (key: string) => string): strin
       return t('dashboard.orderModal.statuses.inProduction');
     case 'completed':
       return t('dashboard.orderModal.statuses.completed');
+    case 'delivered':
+      return t('dashboard.orderModal.statuses.delivered');
     case 'cancelled':
       return t('dashboard.orderModal.statuses.cancelled');
     default:

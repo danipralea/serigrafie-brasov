@@ -78,6 +78,9 @@ test.describe('Complete Order Workflow - Full Happy Path', () => {
       await page.waitForSelector('[data-testid="product-type-dropdown"]', { state: 'visible', timeout: 5000 });
       await page.locator('[data-testid="product-type-option-mugs"]').click();
 
+      await page.locator('[data-testid="sub-order-0-position-input"]').fill('față');
+      await page.locator('[data-testid="sub-order-0-position-add-button"]').click();
+      await page.locator('[data-testid="sub-order-0-position-0-quantity"]').fill('10');
       await page.locator('[data-testid="sub-order-quantity-0"]').fill('100');
       await page.locator('[data-testid="sub-order-description-0"]').fill('Blue mugs with company logo - high resolution print');
 
@@ -96,6 +99,9 @@ test.describe('Complete Order Workflow - Full Happy Path', () => {
       await page.waitForSelector('[data-testid="product-type-dropdown"]', { state: 'visible', timeout: 5000 });
       await page.locator('[data-testid="product-type-option-t-shirts"]').click();
 
+      await page.locator('[data-testid="sub-order-1-position-input"]').fill('piept');
+      await page.locator('[data-testid="sub-order-1-position-add-button"]').click();
+      await page.locator('[data-testid="sub-order-1-position-0-quantity"]').fill('10');
       await page.locator('[data-testid="sub-order-quantity-1"]').fill('50');
       await page.locator('[data-testid="sub-order-description-1"]').fill('White cotton t-shirts size L - front and back print');
 
@@ -114,6 +120,9 @@ test.describe('Complete Order Workflow - Full Happy Path', () => {
       await page.waitForSelector('[data-testid="product-type-dropdown"]', { state: 'visible', timeout: 5000 });
       await page.locator('[data-testid="product-type-option-hoodies"]').click();
 
+      await page.locator('[data-testid="sub-order-2-position-input"]').fill('spate');
+      await page.locator('[data-testid="sub-order-2-position-add-button"]').click();
+      await page.locator('[data-testid="sub-order-2-position-0-quantity"]').fill('10');
       await page.locator('[data-testid="sub-order-quantity-2"]').fill('25');
       await page.locator('[data-testid="sub-order-description-2"]').fill('Black hoodies with embroidered logo - premium quality');
 

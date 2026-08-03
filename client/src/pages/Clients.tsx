@@ -9,6 +9,7 @@ import AddClientModal from '../components/AddClientModal';
 import EditClientModal from '../components/EditClientModal';
 import InviteClientModal from '../components/InviteClientModal';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { getClientPrimaryName, getClientSecondaryName, getDisplayInitials } from '../utils/clientDisplay';
 import { formatDate } from '../utils/dateUtils';
 import { showError, showSuccess } from '../services/notificationService';
 
@@ -138,10 +139,10 @@ export default function Clients() {
         filtered.sort((a, b) => a.createdAt?.toMillis() - b.createdAt?.toMillis());
         break;
       case 'name-asc':
-        filtered.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        filtered.sort((a, b) => getClientPrimaryName(a).localeCompare(getClientPrimaryName(b)));
         break;
       case 'name-desc':
-        filtered.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+        filtered.sort((a, b) => getClientPrimaryName(b).localeCompare(getClientPrimaryName(a)));
         break;
       default:
         break;
@@ -176,15 +177,6 @@ export default function Clients() {
       setShowDeleteDialog(false);
       setSelectedClientId(null);
     }
-  }
-
-  function getInitials(name) {
-    if (!name) return '?';
-    const parts = name.trim().split(' ');
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-    }
-    return name.substring(0, 2).toUpperCase();
   }
 
   function clientHasAccount(client) {
@@ -366,12 +358,12 @@ export default function Clients() {
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center space-x-3">
                       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white text-sm font-bold">
-                        {getInitials(client.name)}
+                        {getDisplayInitials(getClientPrimaryName(client))}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
                           <h4 className="font-semibold text-slate-900 dark:text-white">
-                            {client.name}
+                            {getClientPrimaryName(client)}
                           </h4>
                           {clientHasAccount(client) && (
                             <div
@@ -382,9 +374,9 @@ export default function Clients() {
                             </div>
                           )}
                         </div>
-                        {client.company && (
+                        {getClientSecondaryName(client) && (
                           <p className="text-xs text-slate-500 dark:text-slate-400">
-                            {client.company}
+                            {getClientSecondaryName(client)}
                           </p>
                         )}
                       </div>

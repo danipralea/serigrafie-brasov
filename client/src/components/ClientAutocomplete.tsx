@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { collection, query, getDocs, addDoc, Timestamp } from 'firebase/firestore';
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/20/solid';
+import { getClientPrimaryName, getClientSecondaryName } from '../utils/clientDisplay';
 import { showError } from '../services/notificationService';
 
 interface Client {
@@ -213,10 +214,10 @@ export default function ClientAutocomplete({ selectedClient, onSelectClient, err
               onClick={() => handleSelectClient(client)}
               className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors"
             >
-              <div className="font-medium text-gray-900 dark:text-white">{client.name}</div>
-              {(client.company || client.email) && (
+              <div className="font-medium text-gray-900 dark:text-white">{getClientPrimaryName(client)}</div>
+              {(getClientSecondaryName(client) || client.email) && (
                 <div className="text-sm text-gray-500 dark:text-gray-400">
-                  {[client.company, client.email].filter(Boolean).join(' • ')}
+                  {[getClientSecondaryName(client), client.email].filter(Boolean).join(' • ')}
                 </div>
               )}
             </button>
