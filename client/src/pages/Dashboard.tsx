@@ -52,6 +52,11 @@ export default function Dashboard() {
   const [sortBy, setSortBy] = useState('delivery-asc');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Pagination - past orders is the only list that grows without bound
+  const ORDERS_PER_PAGE = 20;
+  const [currentPage, setCurrentPage] = useState(1);
+  const tableRef = useRef<any>(null);
+
   // Helper function to get earliest delivery time from sub-orders
   const getEarliestDeliveryTime = useCallback((subOrders) => {
     if (!subOrders || subOrders.length === 0) return null;
@@ -331,6 +336,55 @@ export default function Dashboard() {
 
     return filtered;
   }, [orders, activeTab, statusFilter, departmentFilter, sortBy, searchQuery, getEarliestDeliveryTime]);
+
+  const isPaginated = activeTab === 'past';
+  const totalPages = isPaginated
+    ? Math.max(1, Math.ceil(filteredOrders.length / ORDERS_PER_PAGE))
+    : 1;
+
+  // Back to the first page whenever the visible set changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, statusFilter, departmentFilter, sortBy, searchQuery]);
+
+  // Keep the page in range when orders disappear underneath us
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const visibleOrders = useMemo(() => {
+    if (!isPaginated) return filteredOrders;
+    const start = (currentPage - 1) * ORDERS_PER_PAGE;
+    return filteredOrders.slice(start, start + ORDERS_PER_PAGE);
+  }, [filteredOrders, isPaginated, currentPage]);
+
+  // Page buttons: first and last are always shown, the current page keeps a
+  // neighbour on each side, and the skipped ranges collapse into a gap
+  const pageNumbers = useMemo(() => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+
+    const pages: (number | 'gap')[] = [1];
+    const start = Math.max(2, currentPage - 1);
+    const end = Math.min(totalPages - 1, currentPage + 1);
+
+    if (start > 2) pages.push('gap');
+    for (let page = start; page <= end; page++) pages.push(page);
+    if (end < totalPages - 1) pages.push('gap');
+    pages.push(totalPages);
+
+    return pages;
+  }, [currentPage, totalPages]);
+
+  function goToPage(page: number) {
+    const target = Math.min(Math.max(page, 1), totalPages);
+    if (target === currentPage) return;
+    setCurrentPage(target);
+    tableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 
   function handleReorder(e, order) {
     e.stopPropagation(); // Prevent row click from opening order details
@@ -840,7 +894,7 @@ export default function Dashboard() {
         </div>
 
         {/* Orders Table */}
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 transition-colors">
+        <div ref={tableRef} className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 transition-colors scroll-mt-4">
           <div className="px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center gap-2">
             <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white whitespace-nowrap">
               {t(hasTeamAccess(userProfile) ? 'dashboard.table.orders' : 'dashboard.table.yourOrders')} ({filteredOrders.length})
@@ -954,7 +1008,7 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
-                  {filteredOrders.map((order) => {
+                  {visibleOrders.map((order) => {
                     const totalItems = (order.subOrders || []).length;
                     const totalQuantity = (order.subOrders || []).reduce((sum, so) => sum + (so.quantity || 0), 0);
                     const earliestDelivery = getEarliestDeliveryTime(order.subOrders);
@@ -1022,6 +1076,61 @@ export default function Dashboard() {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* Pagination */}
+          {isPaginated && !loading && totalPages > 1 && (
+            <div
+              data-testid="orders-pagination"
+              className="px-4 sm:px-6 py-4 border-t border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row items-center justify-between gap-3"
+            >
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                {t('dashboard.pagination.showing', {
+                  from: (currentPage - 1) * ORDERS_PER_PAGE + 1,
+                  to: Math.min(currentPage * ORDERS_PER_PAGE, filteredOrders.length),
+                  total: filteredOrders.length
+                })}
+              </p>
+              <div className="flex items-center gap-1">
+                <button
+                  data-testid="pagination-previous"
+                  onClick={() => goToPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 rounded-md text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors focus:outline-none"
+                >
+                  {t('dashboard.pagination.previous')}
+                </button>
+                {pageNumbers.map((page, index) =>
+                  page === 'gap' ? (
+                    <span key={`gap-${index}`} className="px-2 text-sm text-slate-400 dark:text-slate-500">
+                      &hellip;
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      data-testid={`pagination-page-${page}`}
+                      onClick={() => goToPage(page)}
+                      aria-current={page === currentPage ? 'page' : undefined}
+                      className={`min-w-9 px-3 py-1.5 rounded-md text-sm transition-colors focus:outline-none ${
+                        page === currentPage
+                          ? 'bg-blue-600 text-white font-semibold'
+                          : 'text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-100 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  )
+                )}
+                <button
+                  data-testid="pagination-next"
+                  onClick={() => goToPage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 rounded-md text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors focus:outline-none"
+                >
+                  {t('dashboard.pagination.next')}
+                </button>
+              </div>
             </div>
           )}
         </div>

@@ -157,6 +157,11 @@
       "pastOrders": "Comenzi trecute",
       "invoicedOrders": "Facturate"
     },
+    "pagination": {
+      "showing": "Afișare {{from}}-{{to}} din {{total}}",
+      "previous": "Înapoi",
+      "next": "Înainte"
+    },
     "filters": {
       "search": "Caută",
       "searchPlaceholder": "Caută comenzi...",
