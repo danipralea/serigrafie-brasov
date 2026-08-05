@@ -133,6 +133,7 @@
     "statusInProgress": "În producție",
     "statusCompleted": "Finalizat",
     "statusDelivered": "Predat",
+    "statusInvoiced": "Facturat",
     "statusCancelled": "Anulat",
     "mon": "Lun",
     "tue": "Mar",
@@ -153,7 +154,8 @@
     },
     "tabs": {
       "currentOrders": "Comenzi curente",
-      "pastOrders": "Comenzi trecute"
+      "pastOrders": "Comenzi trecute",
+      "invoicedOrders": "Facturate"
     },
     "filters": {
       "search": "Caută",
@@ -252,6 +254,7 @@
         "inProduction": "În producție",
         "completed": "Finalizată",
         "delivered": "Predată",
+        "invoiced": "Facturată",
         "cancelled": "Anulată"
       }
     }
@@ -294,6 +297,7 @@
     "in_progress": "în lucru",
     "completed": "finalizat",
     "delivered": "predat",
+    "invoiced": "facturat",
     "cancelled": "anulat"
   },
   "productType": {

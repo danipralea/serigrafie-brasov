@@ -205,9 +205,9 @@ export default function AppShell({ children, title }: { children: React.ReactNod
                       aria-current={item.current ? 'page' : undefined}
                       className={classNames(
                         item.current
-                          ? 'bg-slate-900 text-white dark:bg-slate-950/50'
-                          : 'text-slate-300 hover:bg-white/5 hover:text-white',
-                        'rounded-md px-3 py-2 text-sm font-medium cursor-pointer transition-colors',
+                          ? 'bg-blue-600 text-white font-semibold shadow-sm'
+                          : 'text-slate-300 font-medium hover:bg-white/10 hover:text-white',
+                        'rounded-md px-3 py-2 text-sm cursor-pointer transition-colors',
                       )}
                     >
                       {item.name}
@@ -356,9 +356,9 @@ export default function AppShell({ children, title }: { children: React.ReactNod
                 aria-current={item.current ? 'page' : undefined}
                 className={classNames(
                   item.current
-                    ? 'bg-slate-900 text-white dark:bg-slate-950/50'
-                    : 'text-slate-300 hover:bg-white/5 hover:text-white',
-                  'w-full text-left block rounded-md px-3 py-2 text-base font-medium transition-colors',
+                    ? 'bg-blue-600 text-white font-semibold shadow-sm'
+                    : 'text-slate-300 font-medium hover:bg-white/10 hover:text-white',
+                  'w-full text-left block rounded-md px-3 py-2 text-base transition-colors',
                 )}
               >
                 {item.name}

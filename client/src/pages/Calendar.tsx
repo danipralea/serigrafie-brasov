@@ -26,6 +26,7 @@ const STATUS_COLORS: { [key: string]: string } = {
   [OrderStatus.IN_PROGRESS]: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800',
   [OrderStatus.COMPLETED]: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800',
   [OrderStatus.DELIVERED]: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800',
+  [OrderStatus.INVOICED]: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800',
   [OrderStatus.CANCELLED]: 'bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-400 border-gray-200 dark:border-gray-800',
 };
 
@@ -276,6 +277,7 @@ export default function Calendar() {
                   <option value={OrderStatus.IN_PROGRESS}>{t('calendar.statusInProgress')}</option>
                   <option value={OrderStatus.COMPLETED}>{t('calendar.statusCompleted')}</option>
                   <option value={OrderStatus.DELIVERED}>{t('calendar.statusDelivered')}</option>
+                  <option value={OrderStatus.INVOICED}>{t('calendar.statusInvoiced')}</option>
                   <option value={OrderStatus.CANCELLED}>{t('calendar.statusCancelled')}</option>
                 </select>
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />

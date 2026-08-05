@@ -45,7 +45,7 @@ export default function Dashboard() {
   const [selectedUpdateId, setSelectedUpdateId] = useState(null);
 
   // Tab and filter states
-  const [activeTab, setActiveTab] = useState('current'); // 'current' or 'past'
+  const [activeTab, setActiveTab] = useState('current'); // 'current', 'past' or 'invoiced'
   const [statusFilter, setStatusFilter] = useState('all');
   const [departmentFilter, setDepartmentFilter] = useState('all');
   const { departments } = useDepartments();
@@ -218,7 +218,7 @@ export default function Dashboard() {
   const filteredOrders = useMemo(() => {
     let filtered = [...orders];
 
-    // Apply tab filter - separate current and past orders
+    // Apply tab filter - tabs are mutually exclusive, every status belongs to exactly one
     if (activeTab === 'current') {
       // Current orders: pending_confirmation, pending, in_progress
       filtered = filtered.filter(order =>
@@ -226,6 +226,9 @@ export default function Dashboard() {
         order.status === OrderStatus.PENDING ||
         order.status === OrderStatus.IN_PROGRESS
       );
+    } else if (activeTab === 'invoiced') {
+      // Invoiced orders
+      filtered = filtered.filter(order => order.status === OrderStatus.INVOICED);
     } else {
       // Past orders: completed, delivered, cancelled
       filtered = filtered.filter(order =>
@@ -632,6 +635,8 @@ export default function Dashboard() {
         return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300';
       case OrderStatus.DELIVERED:
         return 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300';
+      case OrderStatus.INVOICED:
+        return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300';
       case OrderStatus.CANCELLED:
         return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300';
       default:
@@ -651,6 +656,8 @@ export default function Dashboard() {
         return t('dashboard.orderModal.statuses.completed');
       case OrderStatus.DELIVERED:
         return t('dashboard.orderModal.statuses.delivered');
+      case OrderStatus.INVOICED:
+        return t('dashboard.orderModal.statuses.invoiced');
       case OrderStatus.CANCELLED:
         return t('dashboard.orderModal.statuses.cancelled');
       default:
@@ -743,6 +750,7 @@ export default function Dashboard() {
                 <option value={OrderStatus.IN_PROGRESS}>{getStatusLabel(OrderStatus.IN_PROGRESS)}</option>
                 <option value={OrderStatus.COMPLETED}>{getStatusLabel(OrderStatus.COMPLETED)}</option>
                 <option value={OrderStatus.DELIVERED}>{getStatusLabel(OrderStatus.DELIVERED)}</option>
+                <option value={OrderStatus.INVOICED}>{getStatusLabel(OrderStatus.INVOICED)}</option>
                 <option value={OrderStatus.CANCELLED}>{getStatusLabel(OrderStatus.CANCELLED)}</option>
               </select>
             </div>
@@ -811,6 +819,20 @@ export default function Dashboard() {
             >
               {t('dashboard.tabs.currentOrders')}
               {activeTab === 'current' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400"></div>
+              )}
+            </button>
+            <button
+              data-testid="tab-invoiced-orders"
+              onClick={() => setActiveTab('invoiced')}
+              className={`flex-1 px-6 py-4 text-sm font-medium transition-colors relative ${
+                activeTab === 'invoiced'
+                  ? 'text-blue-600 dark:text-blue-400'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              {t('dashboard.tabs.invoicedOrders')}
+              {activeTab === 'invoiced' && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400"></div>
               )}
             </button>

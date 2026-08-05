@@ -123,6 +123,8 @@ function getStatusTranslation(status: string, t: (key: string) => string): strin
       return t('dashboard.orderModal.statuses.completed');
     case 'delivered':
       return t('dashboard.orderModal.statuses.delivered');
+    case 'invoiced':
+      return t('dashboard.orderModal.statuses.invoiced');
     case 'cancelled':
       return t('dashboard.orderModal.statuses.cancelled');
     default:

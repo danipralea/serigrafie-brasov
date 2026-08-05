@@ -170,8 +170,8 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
   async function updateOrderStatus(newStatus: string) {
     if (!selectedOrder) return;
 
-    // Check if trying to complete or hand over the order
-    if (newStatus === OrderStatus.COMPLETED || newStatus === OrderStatus.DELIVERED) {
+    // Check if trying to complete, hand over or invoice the order
+    if (newStatus === OrderStatus.COMPLETED || newStatus === OrderStatus.DELIVERED || newStatus === OrderStatus.INVOICED) {
       // Check if all sub-orders are completed
       const incompleteSubOrders = (selectedOrder.subOrders || []).filter((subOrder: any) =>
         subOrder.status !== OrderStatus.COMPLETED && subOrder.status !== OrderStatus.DELIVERED
@@ -628,6 +628,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
       [OrderStatus.IN_PROGRESS]: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300',
       [OrderStatus.COMPLETED]: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
       [OrderStatus.DELIVERED]: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300',
+      [OrderStatus.INVOICED]: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300',
       [OrderStatus.CANCELLED]: 'bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-300'
     };
     return colors[status] || 'bg-gray-100 text-gray-700';
@@ -1037,7 +1038,8 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                               {t('order.updateSubOrderStatus')}
                             </h6>
                             <div className="flex gap-2 flex-wrap">
-                              {Object.values(OrderStatus).map((status) => (
+                              {/* Invoicing happens on the order, not on individual items */}
+                              {Object.values(OrderStatus).filter((status) => status !== OrderStatus.INVOICED).map((status) => (
                                 <button
                                   key={status}
                                   onClick={() => updateSubOrderStatus(subOrder.id, status)}
@@ -1062,7 +1064,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
             )}
 
             {/* Invoice Section */}
-            {(selectedOrder.status === OrderStatus.COMPLETED || selectedOrder.status === OrderStatus.DELIVERED) && (
+            {(selectedOrder.status === OrderStatus.COMPLETED || selectedOrder.status === OrderStatus.DELIVERED || selectedOrder.status === OrderStatus.INVOICED) && (
               <div className="mb-6 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
                 <div className="flex items-start space-x-3">
                   <svg className="w-6 h-6 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
