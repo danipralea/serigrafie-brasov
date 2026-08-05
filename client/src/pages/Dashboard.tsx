@@ -881,13 +881,13 @@ export default function Dashboard() {
               onClick={() => setActiveTab('invoiced')}
               className={`flex-1 px-6 py-4 text-sm font-medium transition-colors relative ${
                 activeTab === 'invoiced'
-                  ? 'text-blue-600 dark:text-blue-400'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                  ? 'text-red-600 dark:text-red-400 font-semibold'
+                  : 'text-red-500/80 dark:text-red-400/70 hover:text-red-600 dark:hover:text-red-300'
               }`}
             >
               {t('dashboard.tabs.invoicedOrders')}
               {activeTab === 'invoiced' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400"></div>
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-600 dark:bg-red-400"></div>
               )}
             </button>
           </div>
