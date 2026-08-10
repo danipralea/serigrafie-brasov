@@ -2,23 +2,85 @@ import { jsPDF } from 'jspdf';
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { formatDate } from '../utils/dateUtils';
+import {
+  PositionEntry,
+  formatPositioning,
+  getPositioningTotalCost,
+  normalizePositioning
+} from '../utils/positioning';
+
+/** One line on the invoice - mirrors a sub-order of the order. */
+export interface InvoiceItem {
+  productType: string;
+  quantity?: number | null;
+  description?: string;
+  positioning?: PositionEntry[];
+  /** Line total; derived from the positions when not given. */
+  amount?: number | null;
+}
 
 export interface InvoiceData {
   orderId: string;
   orderNumber: string;
+  orderName?: string;
   clientName: string;
-  clientEmail: string;
+  clientEmail?: string;
   clientPhone?: string;
-  productType: string;
-  quantity: number;
-  description: string;
-  createdAt: Date;
+  clientCompany?: string;
+  items: InvoiceItem[];
+  createdAt?: Date;
   completedAt?: Date;
-  amount?: number;
+  /** Invoice total; derived from the item amounts when not given. */
+  amount?: number | null;
+}
+
+function money(value: number | null | undefined): string {
+  return value === null || value === undefined ? '---' : `${value.toFixed(2)} RON`;
+}
+
+function getItemAmount(item: InvoiceItem): number | null {
+  if (item.amount !== null && item.amount !== undefined) return item.amount;
+  return getPositioningTotalCost(item.positioning || []);
+}
+
+function getInvoiceTotal(invoiceData: InvoiceData): number | null {
+  if (invoiceData.amount !== null && invoiceData.amount !== undefined) return invoiceData.amount;
+  const amounts = (invoiceData.items || [])
+    .map(getItemAmount)
+    .filter((amount): amount is number => amount !== null);
+  if (amounts.length === 0) return null;
+  return Math.round(amounts.reduce((sum, amount) => sum + amount, 0) * 100) / 100;
+}
+
+/**
+ * Builds the invoice payload from an order document and its sub-orders.
+ * Every field is optional on the order, so nothing here may assume a shape.
+ */
+export function buildInvoiceData(order: any): InvoiceData {
+  const subOrders: any[] = Array.isArray(order?.subOrders) ? order.subOrders : [];
+
+  return {
+    orderId: order?.id || '',
+    orderNumber: order?.id ? String(order.id).substring(0, 8).toUpperCase() : '',
+    orderName: order?.orderName || '',
+    clientName: order?.clientName || order?.userName || order?.userEmail || 'Client',
+    clientCompany: order?.clientCompany || '',
+    clientEmail: order?.clientEmail || order?.userEmail || '',
+    clientPhone: order?.clientPhone || order?.contactPhone || '',
+    items: subOrders.map((subOrder) => ({
+      productType: subOrder?.productTypeName || subOrder?.productType || '-',
+      quantity: subOrder?.quantity ?? null,
+      description: subOrder?.description || '',
+      positioning: normalizePositioning(subOrder?.positioning, subOrder)
+    })),
+    createdAt: order?.createdAt?.toDate?.(),
+    completedAt: order?.updatedAt?.toDate?.()
+  };
 }
 
 export function generateInvoicePDF(invoiceData: InvoiceData): jsPDF {
   const doc = new jsPDF();
+  const pageHeight = doc.internal.pageSize.getHeight();
 
   // Company Header
   doc.setFontSize(24);
@@ -33,80 +95,149 @@ export function generateInvoicePDF(invoiceData: InvoiceData): jsPDF {
   // Invoice Title
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
-  doc.text('FACTURĂ / INVOICE', 105, 50, { align: 'center' });
+  doc.text('FACTURA / INVOICE', 105, 50, { align: 'center' });
 
   // Invoice Number and Date
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Număr factură / Invoice Number: ${invoiceData.orderNumber}`, 20, 65);
-  doc.text(`Data / Date: ${invoiceData.completedAt ? formatDate(invoiceData.completedAt) : formatDate(new Date())}`, 20, 72);
+  doc.text(`Numar factura / Invoice Number: ${invoiceData.orderNumber || '-'}`, 20, 65);
+  doc.text(
+    `Data / Date: ${formatDate(invoiceData.completedAt || invoiceData.createdAt || new Date())}`,
+    20,
+    72
+  );
+  if (invoiceData.orderName) {
+    doc.text(`Comanda / Order: ${invoiceData.orderName}`, 20, 79);
+  }
 
   // Client Information
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text('Date client / Client Information:', 20, 85);
+  doc.text('Date client / Client Information:', 20, 92);
 
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Nume / Name: ${invoiceData.clientName}`, 20, 93);
-  doc.text(`Email: ${invoiceData.clientEmail}`, 20, 100);
+  let y = 100;
+  doc.text(`Nume / Name: ${invoiceData.clientName || '-'}`, 20, y);
+  if (invoiceData.clientCompany) {
+    y += 7;
+    doc.text(`Firma / Company: ${invoiceData.clientCompany}`, 20, y);
+  }
+  if (invoiceData.clientEmail) {
+    y += 7;
+    doc.text(`Email: ${invoiceData.clientEmail}`, 20, y);
+  }
   if (invoiceData.clientPhone) {
-    doc.text(`Telefon / Phone: ${invoiceData.clientPhone}`, 20, 107);
+    y += 7;
+    doc.text(`Telefon / Phone: ${invoiceData.clientPhone}`, 20, y);
   }
 
   // Order Details
+  y += 18;
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text('Detalii comandă / Order Details:', 20, 125);
+  doc.text('Detalii comanda / Order Details:', 20, y);
 
   // Table Header
-  doc.setFillColor(59, 130, 246); // Blue
-  doc.rect(20, 132, 170, 8, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Produs / Product', 25, 137);
-  doc.text('Cantitate / Qty', 120, 137);
-  doc.text('Suma / Amount', 155, 137);
+  y += 7;
+  function drawTableHeader() {
+    doc.setFillColor(59, 130, 246); // Blue
+    doc.rect(20, y, 170, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Produs / Product', 25, y + 5.5);
+    doc.text('Cantitate / Qty', 115, y + 5.5);
+    doc.text('Suma / Amount', 155, y + 5.5);
+    doc.setTextColor(0, 0, 0);
+    y += 14;
+  }
+  drawTableHeader();
 
-  // Table Row
-  doc.setTextColor(0, 0, 0);
-  doc.setFont('helvetica', 'normal');
-  doc.text(invoiceData.productType, 25, 147);
-  doc.text(invoiceData.quantity.toString(), 125, 147);
-  doc.text(invoiceData.amount ? `${invoiceData.amount} RON` : '---', 155, 147);
+  /** Starts a new page when the next block would not fit. */
+  function ensureSpace(height: number) {
+    if (y + height <= pageHeight - 30) return;
+    doc.addPage();
+    y = 20;
+    drawTableHeader();
+  }
 
-  // Description
-  doc.setFontSize(9);
-  const splitDescription = doc.splitTextToSize(`Descriere / Description: ${invoiceData.description}`, 170);
-  doc.text(splitDescription, 25, 155);
+  const items = invoiceData.items || [];
+
+  if (items.length === 0) {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'italic');
+    doc.text('Nicio pozitie / No items', 25, y);
+    y += 8;
+  }
+
+  items.forEach((item, index) => {
+    const positions = item.positioning || [];
+    const positioningText = positions.length > 0 ? formatPositioning(positions) : '';
+    const detailLines: string[] = [];
+
+    if (positioningText) {
+      detailLines.push(...doc.splitTextToSize(`Pozitionare: ${positioningText}`, 160));
+    }
+    if (item.description) {
+      detailLines.push(...doc.splitTextToSize(`Descriere: ${item.description}`, 160));
+    }
+
+    ensureSpace(8 + detailLines.length * 5);
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${index + 1}. ${item.productType || '-'}`, 25, y);
+    doc.text(item.quantity === null || item.quantity === undefined ? '-' : String(item.quantity), 120, y);
+    doc.text(money(getItemAmount(item)), 155, y);
+
+    if (detailLines.length > 0) {
+      y += 5;
+      doc.setFontSize(8);
+      doc.setTextColor(90, 90, 90);
+      doc.text(detailLines, 29, y);
+      doc.setTextColor(0, 0, 0);
+      y += detailLines.length * 4;
+    }
+
+    y += 6;
+  });
 
   // Total
-  const descHeight = splitDescription.length * 5;
-  const totalY = 160 + descHeight;
+  ensureSpace(20);
+  y += 4;
+  doc.setDrawColor(200, 200, 200);
+  doc.line(20, y, 190, y);
+  y += 8;
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text('Total:', 140, totalY);
-  doc.text(invoiceData.amount ? `${invoiceData.amount} RON` : '---', 170, totalY);
+  doc.text('Total:', 130, y);
+  doc.text(money(getInvoiceTotal(invoiceData)), 155, y);
 
-  // Footer
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'italic');
-  doc.text('Mulțumim pentru comandă! / Thank you for your order!', 105, 280, { align: 'center' });
-  doc.text('Pentru întrebări, vă rugăm să ne contactați la contact@serigrafie-brasov.ro', 105, 286, { align: 'center' });
+  // Footer on every page
+  const pageCount = doc.getNumberOfPages();
+  for (let page = 1; page <= pageCount; page++) {
+    doc.setPage(page);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(0, 0, 0);
+    doc.text('Multumim pentru comanda! / Thank you for your order!', 105, pageHeight - 17, { align: 'center' });
+    doc.text('Pentru intrebari, va rugam sa ne contactati la contact@serigrafie-brasov.ro', 105, pageHeight - 11, {
+      align: 'center'
+    });
+  }
 
   return doc;
 }
 
 export function downloadInvoice(invoiceData: InvoiceData): void {
   const doc = generateInvoicePDF(invoiceData);
-  doc.save(`Factura_${invoiceData.orderNumber}.pdf`);
+  doc.save(`Factura_${invoiceData.orderNumber || invoiceData.orderId}.pdf`);
 }
 
 export async function sendInvoiceToClient(invoiceData: InvoiceData): Promise<void> {
   // Generate PDF
-  const doc = generateInvoicePDF(invoiceData);
-  const pdfBlob = doc.output('blob');
+  generateInvoicePDF(invoiceData);
 
   // In a real application, you would upload this to Firebase Storage
   // and send an email with the link or attachment
@@ -116,7 +247,7 @@ export async function sendInvoiceToClient(invoiceData: InvoiceData): Promise<voi
   await addDoc(notificationsRef, {
     type: 'invoice_sent',
     title: 'Invoice sent',
-    message: `Invoice for order #${invoiceData.orderNumber} has been sent to ${invoiceData.clientEmail}`,
+    message: `Invoice for order #${invoiceData.orderNumber} has been sent to ${invoiceData.clientEmail || ''}`,
     orderId: invoiceData.orderId,
     read: false,
     createdAt: Timestamp.now()

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth, hasTeamAccess, hasAdminAccess } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, orderBy as firestoreOrderBy, doc, updateDoc, addDoc, deleteDoc, Timestamp, onSnapshot } from 'firebase/firestore';
-import { OrderStatus, ProductType } from '../types';
+import { OrderStatus } from '../types';
 import { formatPositioning, normalizePositioning } from '../utils/positioning';
 import { getOrderClientPrimaryName, getOrderClientSecondaryName } from '../utils/clientDisplay';
 import { useDepartments } from '../hooks/useDepartments';
@@ -14,7 +14,6 @@ import Notifications from '../components/Notifications';
 import ConfirmDialog from '../components/ConfirmDialog';
 import AppShell from '../components/AppShell';
 import OrderDetailsModal from '../components/OrderDetailsModal';
-import { downloadInvoice, sendInvoiceToClient } from '../services/invoiceService';
 import { exportOrdersToExcel } from '../services/reportService';
 import { uploadFile } from '../services/storageService';
 import { showSuccess, showError } from '../services/notificationService';
@@ -40,7 +39,6 @@ export default function Dashboard() {
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const attachmentInputRef = useRef(null);
   const updatesEndRef = useRef(null);
-  const [sendingInvoice, setSendingInvoice] = useState(false);
   const [showDeleteUpdateDialog, setShowDeleteUpdateDialog] = useState(false);
   const [selectedUpdateId, setSelectedUpdateId] = useState(null);
 
@@ -623,60 +621,6 @@ export default function Dashboard() {
     }
   }
 
-  function handleDownloadInvoice() {
-    if (!selectedOrder) return;
-
-    try {
-      downloadInvoice({
-        orderId: selectedOrder.id,
-        orderNumber: selectedOrder.id.substring(0, 8).toUpperCase(),
-        clientName: selectedOrder.userName || selectedOrder.userEmail || 'Client',
-        clientEmail: selectedOrder.userEmail || '',
-        clientPhone: selectedOrder.contactPhone,
-        productType: getProductLabel(selectedOrder.productType),
-        quantity: selectedOrder.quantity,
-        description: selectedOrder.description,
-        createdAt: selectedOrder.createdAt?.toDate(),
-        completedAt: selectedOrder.updatedAt?.toDate(),
-        amount: undefined // You can add pricing logic here
-      });
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error('Error downloading invoice:', error);
-      }
-      showError(t('dashboard.orderModal.downloadInvoiceError'));
-    }
-  }
-
-  async function handleSendInvoice() {
-    if (!selectedOrder) return;
-
-    try {
-      setSendingInvoice(true);
-      await sendInvoiceToClient({
-        orderId: selectedOrder.id,
-        orderNumber: selectedOrder.id.substring(0, 8).toUpperCase(),
-        clientName: selectedOrder.userName || selectedOrder.userEmail || 'Client',
-        clientEmail: selectedOrder.userEmail || '',
-        clientPhone: selectedOrder.contactPhone,
-        productType: getProductLabel(selectedOrder.productType),
-        quantity: selectedOrder.quantity,
-        description: selectedOrder.description,
-        createdAt: selectedOrder.createdAt?.toDate(),
-        completedAt: selectedOrder.updatedAt?.toDate(),
-        amount: undefined // You can add pricing logic here
-      });
-      showSuccess(t('dashboard.orderModal.invoiceSentSuccess'));
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error('Error sending invoice:', error);
-      }
-      showError(t('dashboard.orderModal.sendInvoiceError'));
-    } finally {
-      setSendingInvoice(false);
-    }
-  }
-
   function getStatusColor(status) {
     switch (status) {
       case OrderStatus.PENDING_CONFIRMATION:
@@ -716,25 +660,6 @@ export default function Dashboard() {
         return t('dashboard.orderModal.statuses.cancelled');
       default:
         return status;
-    }
-  }
-
-  function getProductLabel(productType) {
-    switch (productType) {
-      case ProductType.MUGS:
-        return t('placeOrder.products.mugs');
-      case ProductType.T_SHIRTS:
-        return t('placeOrder.products.tshirts');
-      case ProductType.HOODIES:
-        return t('placeOrder.products.hoodies');
-      case ProductType.BAGS:
-        return t('placeOrder.products.bags');
-      case ProductType.CAPS:
-        return t('placeOrder.products.caps');
-      case ProductType.OTHER:
-        return t('placeOrder.products.other');
-      default:
-        return productType;
     }
   }
 

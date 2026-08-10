@@ -2,14 +2,16 @@ import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth, hasTeamAccess, hasAdminAccess } from '../contexts/AuthContext';
 import { db } from '../firebase';
-import { collection, query, where, getDocs, doc, updateDoc, addDoc, deleteDoc, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, addDoc, deleteDoc, writeBatch, Timestamp } from 'firebase/firestore';
+import { PlusIcon } from '@heroicons/react/20/solid';
 import { OrderStatus } from '../types';
 import { useDepartments } from '../hooks/useDepartments';
-import { downloadInvoice, sendInvoiceToClient } from '../services/invoiceService';
+import { buildInvoiceData, downloadInvoice, sendInvoiceToClient } from '../services/invoiceService';
 import { uploadFile } from '../services/storageService';
 import { showSuccess, showError } from '../services/notificationService';
 import ConfirmDialog from './ConfirmDialog';
 import PositioningEditor from './PositioningEditor';
+import SubOrderItem, { SubOrderData } from './SubOrderItem';
 import { formatDate } from '../utils/dateUtils';
 import {
   formatPositioning,
@@ -40,6 +42,8 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const attachmentInputRef = useRef<any>(null);
   const updatesEndRef = useRef<any>(null);
+  const lastNewItemRef = useRef<any>(null);
+  const modalPanelRef = useRef<any>(null);
   const [sendingInvoice, setSendingInvoice] = useState(false);
   const [showDeleteUpdateDialog, setShowDeleteUpdateDialog] = useState(false);
   const [selectedUpdateId, setSelectedUpdateId] = useState<any>(null);
@@ -47,6 +51,8 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<any>({});
   const [editSubOrders, setEditSubOrders] = useState<any[]>([]);
+  const [newSubOrders, setNewSubOrders] = useState<SubOrderData[]>([]);
+  const [editError, setEditError] = useState('');
   const { departments } = useDepartments();
   const [saving, setSaving] = useState(false);
 
@@ -413,6 +419,8 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
         designFile: so.designFile || '',
       }))
     );
+    setNewSubOrders([]);
+    setEditError('');
     setIsEditing(true);
   }
 
@@ -420,10 +428,72 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
     setIsEditing(false);
     setEditData({});
     setEditSubOrders([]);
+    setNewSubOrders([]);
+    setEditError('');
+  }
+
+  function createEmptySubOrder(): SubOrderData {
+    return {
+      id: crypto.randomUUID(),
+      productType: null,
+      positioning: [],
+      quantity: '',
+      description: '',
+      designFile: '',
+      deliveryTime: '',
+      notes: ''
+    };
+  }
+
+  function addNewSubOrder() {
+    setNewSubOrders(prev => [...prev, createEmptySubOrder()]);
+    // The new item is appended at the bottom of a long modal, so bring it into
+    // view, clear of the sticky header.
+    setTimeout(() => {
+      const item = lastNewItemRef.current;
+      const panel = modalPanelRef.current;
+      if (item && panel) {
+        panel.scrollTo({ top: Math.max(item.offsetTop - 80, 0), behavior: 'smooth' });
+      }
+    }, 50);
+  }
+
+  function handleNewSubOrderChange(id: string, field: string, value: any) {
+    setNewSubOrders(prev => prev.map(so => (so.id === id ? { ...so, [field]: value } : so)));
+  }
+
+  /** Validates the items added during editing. Returns an error message, or ''. */
+  function validateNewSubOrders(): string {
+    for (let i = 0; i < newSubOrders.length; i++) {
+      const so = newSubOrders[i];
+      const label = `${t('order.subOrderItem')} #${(selectedOrder.subOrders?.length || 0) + i + 1}`;
+
+      if (!so.productType) return `${label}: ${t('order.errorProductTypeRequired')}`;
+      if (!so.positioning || so.positioning.length === 0) return `${label}: ${t('order.errorPositioningRequired')}`;
+      if (!so.quantity || parseInt(so.quantity) <= 0) return `${label}: ${t('order.errorQuantityRequired')}`;
+      if (!so.deliveryTime || !so.deliveryTime.trim()) return `${label}: ${t('order.errorDeliveryTimeRequired')}`;
+    }
+    return '';
+  }
+
+  /** Re-reads the sub-orders of the open order after they have been changed. */
+  async function refreshSubOrders(orderId: string) {
+    const subOrdersRef = collection(db, 'orders', orderId, 'subOrders');
+    const snapshot = await getDocs(subOrdersRef);
+    return snapshot.docs.map(subDoc => ({ id: subDoc.id, ...subDoc.data() }));
   }
 
   async function saveChanges() {
     if (!selectedOrder || !currentUser) return;
+
+    const newItemsError = validateNewSubOrders();
+    if (newItemsError) {
+      // The message also goes to a toast: the inline one can be off-screen
+      setEditError(newItemsError);
+      showError(newItemsError);
+      return;
+    }
+    setEditError('');
 
     const changes: { field: string; oldValue: string; newValue: string }[] = [];
 
@@ -497,6 +567,33 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
       }
     }
 
+    // Items added while editing (the order was supplemented with more products)
+    const addedSubOrders = newSubOrders.map((so, i) => {
+      const positioning = toStoredPositioning(so.positioning);
+      changes.push({
+        field: `${t('order.subOrderItem')} #${(selectedOrder.subOrders?.length || 0) + i + 1}`,
+        oldValue: '',
+        newValue: `${so.productType?.name || ''} - ${parseInt(so.quantity)} ${t('placeOrder.quantity').toLowerCase()}`,
+      });
+
+      return {
+        userId: selectedOrder.userId || currentUser.uid,
+        productType: so.productType?.id || '',
+        productTypeName: so.productType?.name || '',
+        productTypeCustom: so.productType?.isCustom || false,
+        positioning,
+        quantity: parseInt(so.quantity),
+        description: so.description || '',
+        designFile: so.designFile || '',
+        designFilePath: so.designFilePath || '',
+        deliveryTime: so.deliveryTime || null,
+        notes: so.notes || '',
+        departmentId: so.departmentId || null,
+        departmentName: so.departmentName || null,
+        status: OrderStatus.PENDING,
+      };
+    });
+
     if (changes.length === 0) {
       showSuccess(t('orderDetails.noChanges'));
       setIsEditing(false);
@@ -505,15 +602,24 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
 
     try {
       setSaving(true);
+      const timestamp = Timestamp.now();
 
-      if (Object.keys(orderUpdate).length > 0) {
-        const orderRef = doc(db, 'orders', selectedOrder.id);
-        await updateDoc(orderRef, { ...orderUpdate, updatedAt: Timestamp.now() });
-      }
+      // The parent order is always touched so the orders listener re-reads the items
+      const orderRef = doc(db, 'orders', selectedOrder.id);
+      await updateDoc(orderRef, { ...orderUpdate, updatedAt: timestamp });
 
       for (const sub of subOrderUpdates) {
         const subRef = doc(db, 'orders', selectedOrder.id, 'subOrders', sub.id);
         await updateDoc(subRef, { ...sub.data, updatedAt: Timestamp.now() });
+      }
+
+      if (addedSubOrders.length > 0) {
+        const batch = writeBatch(db);
+        addedSubOrders.forEach((subOrderData) => {
+          const subOrderRef = doc(collection(db, 'orders', selectedOrder.id, 'subOrders'));
+          batch.set(subOrderRef, { ...subOrderData, createdAt: timestamp, updatedAt: timestamp });
+        });
+        await batch.commit();
       }
 
       const editedByName = userProfile?.displayName || currentUser.displayName || currentUser.email || 'Unknown';
@@ -536,13 +642,17 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
       });
 
       const updatedOrder = { ...selectedOrder, ...orderUpdate };
-      if (subOrderUpdates.length > 0) {
+      if (addedSubOrders.length > 0) {
+        // Items were created, so the ids come from Firestore
+        updatedOrder.subOrders = await refreshSubOrders(selectedOrder.id);
+      } else if (subOrderUpdates.length > 0) {
         updatedOrder.subOrders = selectedOrder.subOrders.map((so: any) => {
           const update = subOrderUpdates.find(u => u.id === so.id);
           return update ? { ...so, ...update.data } : so;
         });
       }
       setSelectedOrder(updatedOrder);
+      setNewSubOrders([]);
 
       await fetchOrderUpdates(selectedOrder.id);
       setIsEditing(false);
@@ -562,19 +672,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
     if (!selectedOrder) return;
 
     try {
-      downloadInvoice({
-        orderId: selectedOrder.id,
-        orderNumber: selectedOrder.id.substring(0, 8).toUpperCase(),
-        clientName: selectedOrder.userName || selectedOrder.userEmail || 'Client',
-        clientEmail: selectedOrder.userEmail || '',
-        clientPhone: selectedOrder.contactPhone,
-        productType: getProductLabel(selectedOrder.productType),
-        quantity: selectedOrder.quantity,
-        description: selectedOrder.description,
-        createdAt: selectedOrder.createdAt?.toDate(),
-        completedAt: selectedOrder.updatedAt?.toDate(),
-        amount: undefined
-      });
+      downloadInvoice(buildInvoiceData(selectedOrder));
     } catch (error) {
       if (import.meta.env.DEV) {
         console.error('Error downloading invoice:', error);
@@ -588,19 +686,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
 
     try {
       setSendingInvoice(true);
-      await sendInvoiceToClient({
-        orderId: selectedOrder.id,
-        orderNumber: selectedOrder.id.substring(0, 8).toUpperCase(),
-        clientName: selectedOrder.userName || selectedOrder.userEmail || 'Client',
-        clientEmail: selectedOrder.userEmail || '',
-        clientPhone: selectedOrder.contactPhone,
-        productType: getProductLabel(selectedOrder.productType),
-        quantity: selectedOrder.quantity,
-        description: selectedOrder.description,
-        createdAt: selectedOrder.createdAt?.toDate(),
-        completedAt: selectedOrder.updatedAt?.toDate(),
-        amount: undefined
-      });
+      await sendInvoiceToClient(buildInvoiceData(selectedOrder));
       showSuccess(t('dashboard.orderModal.invoiceSent'));
     } catch (error) {
       if (import.meta.env.DEV) {
@@ -610,11 +696,6 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
     } finally {
       setSendingInvoice(false);
     }
-  }
-
-  function getProductLabel(productType: string) {
-    const key = productType?.replace(/-/g, '') || '';
-    return t(`placeOrder.products.${key}`) || productType;
   }
 
   function getStatusLabel(status: string) {
@@ -644,11 +725,12 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
         onClick={onClose}
       >
         <div
+          ref={modalPanelRef}
           className="relative bg-white dark:bg-slate-800 rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-slate-700 transition-colors"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Modal Header */}
-          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center sticky top-0 bg-white dark:bg-slate-800">
+          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center sticky top-0 z-20 bg-white dark:bg-slate-800">
             <div>
               <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
                 {isEditing ? t('orderDetails.editing') : t('dashboard.orderModal.order')}
@@ -671,6 +753,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
             <div className="flex items-center gap-2">
               {hasTeamAccess(userProfile) && !isEditing && (
                 <button
+                  data-testid="order-edit-button"
                   onClick={enterEditMode}
                   className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 p-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
                   title={t('orderDetails.edit')}
@@ -690,6 +773,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                     {t('orderDetails.cancel')}
                   </button>
                   <button
+                    data-testid="order-edit-save-button"
                     onClick={saveChanges}
                     disabled={saving}
                     className="px-3 py-1.5 text-sm text-white bg-gradient-to-r from-blue-600 to-cyan-500 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
@@ -815,11 +899,24 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
             </div>
 
             {/* Sub-Orders */}
-            {selectedOrder.subOrders && selectedOrder.subOrders.length > 0 && (
+            {((selectedOrder.subOrders && selectedOrder.subOrders.length > 0) || isEditing) && (
               <div className="mb-6">
-                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{t('order.orderItems')}</h4>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">{t('order.orderItems')}</h4>
+                  {isEditing && (
+                    <button
+                      data-testid="order-edit-add-item-button"
+                      type="button"
+                      onClick={addNewSubOrder}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-md transition-colors"
+                    >
+                      <PlusIcon className="w-5 h-5" />
+                      {t('order.addItem')}
+                    </button>
+                  )}
+                </div>
                 <div className="space-y-3">
-                  {selectedOrder.subOrders.map((subOrder: any, index: number) => {
+                  {(selectedOrder.subOrders || []).map((subOrder: any, index: number) => {
                     const editSub = editSubOrders[index];
                     const updateEditSub = (fields: Record<string, any>) => {
                       const updated = [...editSubOrders];
@@ -1059,7 +1156,29 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                       </div>
                     );
                   })}
+
+                  {/* Items added while editing */}
+                  {isEditing && newSubOrders.map((subOrder, index) => (
+                    <div
+                      key={subOrder.id}
+                      data-testid={`order-edit-new-item-${index}`}
+                      ref={index === newSubOrders.length - 1 ? lastNewItemRef : undefined}
+                    >
+                      <SubOrderItem
+                        subOrder={subOrder}
+                        index={(selectedOrder.subOrders?.length || 0) + index}
+                        onChange={handleNewSubOrderChange}
+                        onRemove={(id) => setNewSubOrders(prev => prev.filter(so => so.id !== id))}
+                        canRemove={true}
+                        departments={departments}
+                      />
+                    </div>
+                  ))}
                 </div>
+
+                {isEditing && editError && (
+                  <p className="mt-3 text-sm text-red-600 dark:text-red-400">{editError}</p>
+                )}
               </div>
             )}
 
