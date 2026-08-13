@@ -17,13 +17,14 @@ import OrderDetailsModal from '../components/OrderDetailsModal';
 import { exportOrdersToExcel } from '../services/reportService';
 import { uploadFile } from '../services/storageService';
 import { showSuccess, showError } from '../services/notificationService';
+import { isOrderInTrash, restoreOrderFromTrash, deleteOrderPermanently } from '../services/orderTrashService';
 import { formatDate } from '../utils/dateUtils';
 
 export default function Dashboard() {
   const { currentUser, userProfile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -34,7 +35,6 @@ export default function Dashboard() {
   const [updateText, setUpdateText] = useState('');
   const [postingUpdate, setPostingUpdate] = useState(false);
   const [orderUpdates, setOrderUpdates] = useState<any[]>([]);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [attachmentFile, setAttachmentFile] = useState(null);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const attachmentInputRef = useRef(null);
@@ -43,12 +43,17 @@ export default function Dashboard() {
   const [selectedUpdateId, setSelectedUpdateId] = useState(null);
 
   // Tab and filter states
-  const [activeTab, setActiveTab] = useState('current'); // 'current', 'past' or 'invoiced'
+  const [activeTab, setActiveTab] = useState('current'); // 'current', 'past', 'invoiced' or 'trash'
   const [statusFilter, setStatusFilter] = useState('all');
   const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [monthFilter, setMonthFilter] = useState('all'); // 'all' or 'YYYY-MM'
   const { departments } = useDepartments();
   const [sortBy, setSortBy] = useState('delivery-asc');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Trash actions
+  const [orderToRestore, setOrderToRestore] = useState<any>(null);
+  const [orderToPurge, setOrderToPurge] = useState<any>(null);
 
   // Pagination - past orders is the only list that grows without bound
   const ORDERS_PER_PAGE = 20;
@@ -217,73 +222,112 @@ export default function Dashboard() {
     }
   }, [orderUpdates]);
 
-  // Use useMemo to calculate filtered orders - eliminates unnecessary state and useEffect
-  const filteredOrders = useMemo(() => {
-    let filtered = [...orders];
+  // Deleted orders live in the trash until they are purged from there
+  const activeOrders = useMemo(() => orders.filter(order => !isOrderInTrash(order)), [orders]);
+  const trashedOrders = useMemo(() => orders.filter(order => isOrderInTrash(order)), [orders]);
 
-    // Apply tab filter - tabs are mutually exclusive, every status belongs to exactly one
-    if (activeTab === 'current') {
-      // Current orders: pending_confirmation, pending, in_progress
-      filtered = filtered.filter(order =>
-        order.status === OrderStatus.PENDING_CONFIRMATION ||
-        order.status === OrderStatus.PENDING ||
-        order.status === OrderStatus.IN_PROGRESS
-      );
-    } else if (activeTab === 'invoiced') {
-      // Invoiced orders
-      filtered = filtered.filter(order => order.status === OrderStatus.INVOICED);
-    } else {
-      // Past orders: completed, delivered, cancelled
-      filtered = filtered.filter(order =>
-        order.status === OrderStatus.COMPLETED ||
-        order.status === OrderStatus.DELIVERED ||
-        order.status === OrderStatus.CANCELLED
-      );
+  // Months that actually have orders, newest first
+  const monthOptions = useMemo(() => {
+    const locale = i18n.language?.startsWith('en') ? 'en-GB' : 'ro-RO';
+    const keys = new Set<string>();
+
+    orders.forEach(order => {
+      const date = order.createdAt?.toDate?.();
+      if (!date) return;
+      keys.add(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`);
+    });
+
+    return Array.from(keys)
+      .sort((a, b) => b.localeCompare(a))
+      .map(key => {
+        const [year, month] = key.split('-');
+        const label = new Date(Number(year), Number(month) - 1, 1)
+          .toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+        return { key, label: label.charAt(0).toUpperCase() + label.slice(1) };
+      });
+  }, [orders, i18n.language]);
+
+  // Every filter except the tab itself - so tab counts stay consistent with the list
+  const matchesFilters = useCallback((order: any) => {
+    if (statusFilter !== 'all' && order.status !== statusFilter) return false;
+
+    if (departmentFilter !== 'all' &&
+        !order.subOrders?.some((so: any) => so.departmentId === departmentFilter)) {
+      return false;
     }
 
-    // Apply status filter
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(order => order.status === statusFilter);
+    if (monthFilter !== 'all') {
+      const date = order.createdAt?.toDate?.();
+      if (!date) return false;
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      if (key !== monthFilter) return false;
     }
 
-    // Apply department filter - check sub-orders
-    if (departmentFilter !== 'all') {
-      filtered = filtered.filter(order =>
-        order.subOrders?.some((so: any) => so.departmentId === departmentFilter)
-      );
-    }
-
-    // Apply search - check all fields in order and sub-orders
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(order => {
-        // Search in parent order fields
-        const orderMatches =
-          order.id.toLowerCase().includes(query) ||
-          order.orderName?.toLowerCase().includes(query) ||
-          order.clientName?.toLowerCase().includes(query) ||
-          order.clientEmail?.toLowerCase().includes(query) ||
-          order.clientPhone?.toLowerCase().includes(query) ||
-          order.clientCompany?.toLowerCase().includes(query) ||
-          order.userName?.toLowerCase().includes(query) ||
-          order.userEmail?.toLowerCase().includes(query) ||
-          order.status?.toLowerCase().includes(query);
 
-        // Search in sub-order fields
-        const subOrderMatches = order.subOrders?.some(so =>
-          so.productType?.toLowerCase().includes(query) ||
-          so.productTypeName?.toLowerCase().includes(query) ||
-          so.quantity?.toString().includes(query) ||
-          formatPositioning(normalizePositioning(so.positioning, so)).toLowerCase().includes(query) ||
-          so.description?.toLowerCase().includes(query) ||
-          so.designFile?.toLowerCase().includes(query) ||
-          so.notes?.toLowerCase().includes(query) ||
-          so.status?.toLowerCase().includes(query)
-        );
+      // Search in parent order fields
+      const orderMatches =
+        order.id.toLowerCase().includes(query) ||
+        order.orderName?.toLowerCase().includes(query) ||
+        order.clientName?.toLowerCase().includes(query) ||
+        order.clientEmail?.toLowerCase().includes(query) ||
+        order.clientPhone?.toLowerCase().includes(query) ||
+        order.clientCompany?.toLowerCase().includes(query) ||
+        order.userName?.toLowerCase().includes(query) ||
+        order.userEmail?.toLowerCase().includes(query) ||
+        order.status?.toLowerCase().includes(query);
 
-        return orderMatches || subOrderMatches;
-      });
+      // Search in sub-order fields
+      const subOrderMatches = order.subOrders?.some((so: any) =>
+        so.productType?.toLowerCase().includes(query) ||
+        so.productTypeName?.toLowerCase().includes(query) ||
+        so.quantity?.toString().includes(query) ||
+        formatPositioning(normalizePositioning(so.positioning, so)).toLowerCase().includes(query) ||
+        so.description?.toLowerCase().includes(query) ||
+        so.designFile?.toLowerCase().includes(query) ||
+        so.notes?.toLowerCase().includes(query) ||
+        so.status?.toLowerCase().includes(query)
+      );
+
+      if (!orderMatches && !subOrderMatches) return false;
     }
+
+    return true;
+  }, [statusFilter, departmentFilter, monthFilter, searchQuery]);
+
+  // Tabs are mutually exclusive, every status belongs to exactly one
+  function getTabForOrder(order: any) {
+    if (
+      order.status === OrderStatus.PENDING_CONFIRMATION ||
+      order.status === OrderStatus.PENDING ||
+      order.status === OrderStatus.IN_PROGRESS
+    ) {
+      return 'current';
+    }
+    if (order.status === OrderStatus.INVOICED) return 'invoiced';
+    return 'past';
+  }
+
+  // Order counts per tab, with the current filters applied
+  const tabCounts = useMemo(() => {
+    const counts = { current: 0, past: 0, invoiced: 0, trash: 0 };
+
+    activeOrders.forEach(order => {
+      if (!matchesFilters(order)) return;
+      counts[getTabForOrder(order)]++;
+    });
+
+    counts.trash = trashedOrders.filter(matchesFilters).length;
+
+    return counts;
+  }, [activeOrders, trashedOrders, matchesFilters]);
+
+  // Use useMemo to calculate filtered orders - eliminates unnecessary state and useEffect
+  const filteredOrders = useMemo(() => {
+    let filtered = activeTab === 'trash'
+      ? trashedOrders.filter(matchesFilters)
+      : activeOrders.filter(order => getTabForOrder(order) === activeTab && matchesFilters(order));
 
     // Apply sorting - use earliest delivery time from sub-orders
     switch (sortBy) {
@@ -333,9 +377,9 @@ export default function Dashboard() {
     }
 
     return filtered;
-  }, [orders, activeTab, statusFilter, departmentFilter, sortBy, searchQuery, getEarliestDeliveryTime]);
+  }, [activeOrders, trashedOrders, activeTab, matchesFilters, sortBy, getEarliestDeliveryTime]);
 
-  const isPaginated = activeTab === 'past';
+  const isPaginated = activeTab === 'past' || activeTab === 'trash';
   const totalPages = isPaginated
     ? Math.max(1, Math.ceil(filteredOrders.length / ORDERS_PER_PAGE))
     : 1;
@@ -343,7 +387,7 @@ export default function Dashboard() {
   // Back to the first page whenever the visible set changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeTab, statusFilter, departmentFilter, sortBy, searchQuery]);
+  }, [activeTab, statusFilter, departmentFilter, monthFilter, sortBy, searchQuery]);
 
   // Keep the page in range when orders disappear underneath us
   useEffect(() => {
@@ -549,52 +593,38 @@ export default function Dashboard() {
     }
   }
 
-  async function deleteOrder() {
-    if (!selectedOrder) return;
+  async function restoreOrder() {
+    if (!orderToRestore) return;
 
     try {
-      // Delete sub-orders first
-      const subOrdersRef = collection(db, 'orders', selectedOrder.id, 'subOrders');
-      const subOrdersSnapshot = await getDocs(subOrdersRef);
-      const deleteSubOrderPromises = subOrdersSnapshot.docs.map(doc => deleteDoc(doc.ref));
-      await Promise.all(deleteSubOrderPromises);
-
-      // Delete all updates related to this order
-      const updatesRef = collection(db, 'orderUpdates');
-      const updatesQuery = query(updatesRef, where('orderId', '==', selectedOrder.id));
-      const updatesSnapshot = await getDocs(updatesQuery);
-      const deletePromises = updatesSnapshot.docs.map(doc => deleteDoc(doc.ref));
-      await Promise.all(deletePromises);
-
-      // Delete all notifications related to this order
-      const notificationsRef = collection(db, 'notifications');
-      const notificationsQuery = query(notificationsRef, where('orderId', '==', selectedOrder.id));
-      const notificationsSnapshot = await getDocs(notificationsQuery);
-      const deleteNotifPromises = notificationsSnapshot.docs.map(doc => deleteDoc(doc.ref));
-      await Promise.all(deleteNotifPromises);
-
-      // Delete the order document itself
-      const orderRef = doc(db, 'orders', selectedOrder.id);
-      await deleteDoc(orderRef);
-
-      // Close modal and dialog - orders will update automatically via listener
-      setShowOrderModal(false);
-      setShowDeleteDialog(false);
-
-      // Show success notification
-      showSuccess(t('dashboard.orderModal.orderDeleted'));
+      await restoreOrderFromTrash(orderToRestore.id);
+      setOrderToRestore(null);
+      showSuccess(t('dashboard.trash.restored'));
     } catch (error: any) {
-      console.error('Error deleting order:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error restoring order:', error);
+      }
+      showError(t('dashboard.trash.restoreError'));
+      throw error;
+    }
+  }
 
-      // Show user-friendly error message
+  async function purgeOrder() {
+    if (!orderToPurge) return;
+
+    try {
+      await deleteOrderPermanently(orderToPurge.id);
+      setOrderToPurge(null);
+      showSuccess(t('dashboard.trash.deletedPermanently'));
+    } catch (error: any) {
+      if (import.meta.env.DEV) {
+        console.error('Error deleting order permanently:', error);
+      }
       let errorMessage = t('dashboard.orderModal.deleteError');
       if (error?.code === 'permission-denied') {
         errorMessage = t('dashboard.orderModal.deletePermissionError');
       }
-
       showError(errorMessage);
-
-      // Re-throw error so ConfirmDialog knows it failed
       throw error;
     }
   }
@@ -665,10 +695,10 @@ export default function Dashboard() {
 
   function getOrderStats() {
     return {
-      total: orders.length,
-      pending: orders.filter(o => o.status === OrderStatus.PENDING).length,
-      in_progress: orders.filter(o => o.status === OrderStatus.IN_PROGRESS).length,
-      completed: orders.filter(o => o.status === OrderStatus.COMPLETED).length
+      total: activeOrders.length,
+      pending: activeOrders.filter(o => o.status === OrderStatus.PENDING).length,
+      in_progress: activeOrders.filter(o => o.status === OrderStatus.IN_PROGRESS).length,
+      completed: activeOrders.filter(o => o.status === OrderStatus.COMPLETED).length
     };
   }
 
@@ -702,7 +732,7 @@ export default function Dashboard() {
         {/* Filters and Search - Only for team members */}
         {hasTeamAccess(userProfile) && (
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-6 mb-6 border border-slate-200 dark:border-slate-700 transition-colors">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Search */}
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{t('dashboard.filters.search')}</label>
@@ -749,6 +779,22 @@ export default function Dashboard() {
               </select>
             </div>
 
+            {/* Month Filter */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{t('dashboard.filters.month')}</label>
+              <select
+                data-testid="month-filter-dropdown"
+                value={monthFilter}
+                onChange={(e) => setMonthFilter(e.target.value)}
+                className="w-full h-10 px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              >
+                <option value="all">{t('dashboard.filters.allMonths')}</option>
+                {monthOptions.map(month => (
+                  <option key={month.key} value={month.key}>{month.label}</option>
+                ))}
+              </select>
+            </div>
+
             {/* Sort */}
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{t('dashboard.filters.sortBy')}</label>
@@ -776,13 +822,20 @@ export default function Dashboard() {
             <button
               data-testid="tab-past-orders"
               onClick={() => setActiveTab('past')}
-              className={`flex-1 px-6 py-4 text-sm font-medium transition-colors relative ${
+              className={`flex-1 px-3 sm:px-6 py-4 text-sm font-medium transition-colors relative ${
                 activeTab === 'past'
                   ? 'text-blue-600 dark:text-blue-400'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
               {t('dashboard.tabs.pastOrders')}
+              <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                activeTab === 'past'
+                  ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
+                  : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+              }`}>
+                {tabCounts.past}
+              </span>
               {activeTab === 'past' && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400"></div>
               )}
@@ -790,13 +843,20 @@ export default function Dashboard() {
             <button
               data-testid="tab-current-orders"
               onClick={() => setActiveTab('current')}
-              className={`flex-1 px-6 py-4 text-sm font-medium transition-colors relative ${
+              className={`flex-1 px-3 sm:px-6 py-4 text-sm font-medium transition-colors relative ${
                 activeTab === 'current'
                   ? 'text-blue-600 dark:text-blue-400'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
               {t('dashboard.tabs.currentOrders')}
+              <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                activeTab === 'current'
+                  ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
+                  : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+              }`}>
+                {tabCounts.current}
+              </span>
               {activeTab === 'current' && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400"></div>
               )}
@@ -804,17 +864,51 @@ export default function Dashboard() {
             <button
               data-testid="tab-invoiced-orders"
               onClick={() => setActiveTab('invoiced')}
-              className={`flex-1 px-6 py-4 text-sm font-medium transition-colors relative ${
+              className={`flex-1 px-3 sm:px-6 py-4 text-sm font-medium transition-colors relative ${
                 activeTab === 'invoiced'
                   ? 'text-red-600 dark:text-red-400 font-semibold'
                   : 'text-red-500/80 dark:text-red-400/70 hover:text-red-600 dark:hover:text-red-300'
               }`}
             >
               {t('dashboard.tabs.invoicedOrders')}
+              <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                activeTab === 'invoiced'
+                  ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300'
+                  : 'bg-red-50 dark:bg-red-900/20 text-red-600/90 dark:text-red-300/80'
+              }`}>
+                {tabCounts.invoiced}
+              </span>
               {activeTab === 'invoiced' && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-red-600 dark:bg-red-400"></div>
               )}
             </button>
+            {hasAdminAccess(userProfile) && (
+              <button
+                data-testid="tab-trash-orders"
+                onClick={() => setActiveTab('trash')}
+                title={t('dashboard.tabs.trash')}
+                className={`flex-1 px-3 sm:px-6 py-4 text-sm font-medium transition-colors relative flex items-center justify-center gap-2 ${
+                  activeTab === 'trash'
+                    ? 'text-slate-900 dark:text-white'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+                }`}
+              >
+                <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                <span className="hidden sm:inline">{t('dashboard.tabs.trash')}</span>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                  activeTab === 'trash'
+                    ? 'bg-slate-200 dark:bg-slate-600 text-slate-800 dark:text-white'
+                    : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                }`}>
+                  {tabCounts.trash}
+                </span>
+                {activeTab === 'trash' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-slate-700 dark:bg-slate-300"></div>
+                )}
+              </button>
+            )}
           </div>
         </div>
 
@@ -825,7 +919,7 @@ export default function Dashboard() {
               {t(hasTeamAccess(userProfile) ? 'dashboard.table.orders' : 'dashboard.table.yourOrders')} ({filteredOrders.length})
             </h2>
             <div className="flex items-center gap-2">
-              {hasAdminAccess(userProfile) && (
+              {hasAdminAccess(userProfile) && activeTab !== 'trash' && (
                 <button
                   onClick={() => {
                     if (filteredOrders.length === 0) {
@@ -885,13 +979,17 @@ export default function Dashboard() {
                   d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                 />
               </svg>
-              <h3 className="mt-2 text-sm font-medium text-slate-900 dark:text-white">{t('dashboard.table.noOrders')}</h3>
+              <h3 className="mt-2 text-sm font-medium text-slate-900 dark:text-white">
+                {activeTab === 'trash' ? t('dashboard.trash.empty') : t('dashboard.table.noOrders')}
+              </h3>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                {orders.length === 0
-                  ? t('dashboard.table.noOrdersDesc')
-                  : t('dashboard.table.adjustFilters')}
+                {activeTab === 'trash'
+                  ? t('dashboard.trash.emptyDesc')
+                  : orders.length === 0
+                    ? t('dashboard.table.noOrdersDesc')
+                    : t('dashboard.table.adjustFilters')}
               </p>
-              {orders.length === 0 && (
+              {orders.length === 0 && activeTab !== 'trash' && (
                 <div className="mt-6">
                   <button
                     onClick={() => setShowPlaceOrderModal(true)}
@@ -925,7 +1023,7 @@ export default function Dashboard() {
                     <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                       {t('dashboard.table.date')}
                     </th>
-                    {activeTab === 'past' && !hasTeamAccess(userProfile) && (
+                    {((activeTab === 'past' && !hasTeamAccess(userProfile)) || activeTab === 'trash') && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                         {t('dashboard.table.actions')}
                       </th>
@@ -981,7 +1079,41 @@ export default function Dashboard() {
                             const timeStr = date.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
                             return `${dateStr} - ${timeStr}`;
                           })()}
+                          {activeTab === 'trash' && order.deletedAt?.toDate && (
+                            <div className="text-xs text-red-500 dark:text-red-400">
+                              {t('dashboard.trash.deletedOn', {
+                                date: formatDate(order.deletedAt.toDate()),
+                                user: order.deletedByName || '-'
+                              })}
+                            </div>
+                          )}
                         </td>
+                        {activeTab === 'trash' && (
+                          <td className="px-6 py-4 whitespace-nowrap text-sm" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center gap-2">
+                              <button
+                                data-testid={`order-restore-button-${order.id}`}
+                                onClick={() => setOrderToRestore(order)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors focus:outline-none"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                {t('dashboard.trash.restore')}
+                              </button>
+                              <button
+                                data-testid={`order-purge-button-${order.id}`}
+                                onClick={() => setOrderToPurge(order)}
+                                title={t('dashboard.trash.deletePermanently')}
+                                className="inline-flex items-center px-2 py-1.5 text-sm font-medium rounded-md text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors focus:outline-none"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </div>
+                          </td>
+                        )}
                         {activeTab === 'past' && !hasTeamAccess(userProfile) && (
                           <td className="px-6 py-4 whitespace-nowrap text-sm" onClick={(e) => e.stopPropagation()}>
                             <button
@@ -1080,6 +1212,34 @@ export default function Dashboard() {
           // Order will appear automatically via real-time listener
         }}
       />
+
+      {/* Restore from Trash Dialog */}
+      {orderToRestore && (
+        <ConfirmDialog
+          isOpen={!!orderToRestore}
+          onClose={() => setOrderToRestore(null)}
+          onConfirm={restoreOrder}
+          title={t('dashboard.trash.restore')}
+          message={t('dashboard.trash.restoreConfirm')}
+          confirmText={t('dashboard.trash.restore')}
+          cancelText={t('orderDetails.cancel')}
+          type="info"
+        />
+      )}
+
+      {/* Permanent Delete Dialog */}
+      {orderToPurge && (
+        <ConfirmDialog
+          isOpen={!!orderToPurge}
+          onClose={() => setOrderToPurge(null)}
+          onConfirm={purgeOrder}
+          title={t('dashboard.trash.deletePermanently')}
+          message={t('dashboard.trash.deletePermanentlyConfirm')}
+          confirmText={t('dashboard.trash.deletePermanently')}
+          cancelText={t('orderDetails.cancel')}
+          type="danger"
+        />
+      )}
       </div>
     </AppShell>
   );

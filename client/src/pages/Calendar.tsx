@@ -6,6 +6,7 @@ import { db } from '../firebase';
 import { collection, query, where, getDocs, onSnapshot, Timestamp, doc, getDoc } from 'firebase/firestore';
 import { OrderStatus, ProductType } from '../types';
 import { getOrderClientPrimaryName } from '../utils/clientDisplay';
+import { isOrderInTrash } from '../services/orderTrashService';
 import AppShell from '../components/AppShell';
 import OrderDetailsModal from '../components/OrderDetailsModal';
 import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
@@ -91,7 +92,8 @@ export default function Calendar() {
         })
       );
 
-      setOrders(ordersWithSubOrders);
+      // Orders in the trash are hidden until they are restored
+      setOrders(ordersWithSubOrders.filter(order => !isOrderInTrash(order)));
     });
 
     return () => unsubscribe();

@@ -155,7 +155,21 @@
     "tabs": {
       "currentOrders": "Comenzi curente",
       "pastOrders": "Comenzi trecute",
-      "invoicedOrders": "Facturate"
+      "invoicedOrders": "Facturate",
+      "trash": "Coș de gunoi"
+    },
+    "trash": {
+      "title": "Coș de gunoi",
+      "restore": "Restaurează",
+      "restoreConfirm": "Sigur doriți să restaurați această comandă? Va reveni în lista de comenzi.",
+      "restored": "Comanda a fost restaurată",
+      "restoreError": "Eroare la restaurarea comenzii. Te rugăm să încerci din nou.",
+      "deletePermanently": "Șterge definitiv",
+      "deletePermanentlyConfirm": "Sigur doriți să ștergeți definitiv această comandă? Această acțiune nu poate fi anulată.",
+      "deletedPermanently": "Comanda a fost ștearsă definitiv",
+      "deletedOn": "Șters: {{date}} de {{user}}",
+      "empty": "Coșul de gunoi este gol",
+      "emptyDesc": "Comenzile șterse apar aici și pot fi restaurate."
     },
     "pagination": {
       "showing": "Afișare {{from}}-{{to}} din {{total}}",
@@ -179,7 +193,8 @@
       "quantityHigh": "Cantitate (Mare spre mic)",
       "quantityLow": "Cantitate (Mic spre mare)",
       "byStatus": "Status",
-      "status": "Status"
+      "month": "Luna",
+      "allMonths": "Toate lunile"
     },
     "table": {
       "orderId": "ID comandă",
@@ -248,10 +263,10 @@
       "orderCreatedByTeam": "Comandă creată de echipă",
       "orderCreatedByClient": "Comandă creată de client",
       "export": {
-        "exportToExcel": "Export\u0103 \u00een Excel",
+        "exportToExcel": "Exportă în Excel",
         "exportSuccess": "{{count}} comenzi exportate cu succes",
         "exportError": "Eroare la exportarea comenzilor",
-        "noOrdersToExport": "Nicio comand\u0103 de exportat"
+        "noOrdersToExport": "Nicio comandă de exportat"
       },
       "statuses": {
         "pendingConfirmation": "Așteaptă confirmare",
@@ -261,7 +276,9 @@
         "delivered": "Predată",
         "invoiced": "Facturată",
         "cancelled": "Anulată"
-      }
+      },
+      "orderMovedToTrash": "Comanda a fost mutată în coșul de gunoi",
+      "deleteOrderTrashConfirm": "Sigur doriți să ștergeți această comandă? Va fi mutată în coșul de gunoi și o puteți restaura de acolo."
     }
   },
   "order": {
@@ -630,28 +647,28 @@
     "eFacutra": "Înregistrare E-Factura"
   },
   "report": {
-    "orderId": "ID Comand\u0103",
-    "orderName": "Denumire Comand\u0103",
+    "orderId": "ID Comandă",
+    "orderName": "Denumire Comandă",
     "clientName": "Nume Client",
     "clientCompany": "Companie Client",
     "clientEmail": "Email Client",
     "clientPhone": "Telefon Client",
     "productType": "Tip Produs",
     "quantity": "Cantitate",
-    "positioning": "Pozi\u021bionare",
+    "positioning": "Poziționare",
     "length": "Lungime (cm)",
-    "width": "L\u0103\u021bime (cm)",
-    "area": "Suprafa\u021b\u0103 (cm\u00b2)",
+    "width": "Lățime (cm)",
+    "area": "Suprafață (cm²)",
     "cmp": "Cost/buc (RON)",
-    "positionCost": "Cost Pozi\u021bie (RON)",
+    "positionCost": "Cost Poziție (RON)",
     "department": "Departament",
     "description": "Descriere",
-    "notes": "Noti\u021be",
+    "notes": "Notițe",
     "deliveryTime": "Data Livrare",
-    "designFile": "Fi\u0219ier Design",
-    "orderStatus": "Status Comand\u0103",
+    "designFile": "Fișier Design",
+    "orderStatus": "Status Comandă",
     "itemStatus": "Status Articol",
-    "createdDate": "Data Cre\u0103rii"
+    "createdDate": "Data Creării"
   },
   "admin": {
     "title": "Panou administrare",
@@ -887,9 +904,9 @@
     "deleteOrder": "Șterge comandă"
   },
   "notifications": {
-    "orderCompleted": "Comand\u0103 finalizat\u0103",
-    "orderCompletedMessage": "Comanda #{{orderId}} a fost finalizat\u0103!",
-    "orderStatusChanged": "Status comand\u0103 actualizat",
+    "orderCompleted": "Comandă finalizată",
+    "orderCompletedMessage": "Comanda #{{orderId}} a fost finalizată!",
+    "orderStatusChanged": "Status comandă actualizat",
     "orderStatusChangedMessage": "Comanda #{{orderId}} - status schimbat la: {{status}}",
     "subOrderCompleted": "Articol finalizat",
     "subOrderCompletedMessage": "Articolul \"{{productName}}\" din comanda #{{orderId}} ({{department}}) a fost finalizat"

@@ -58,15 +58,13 @@
     "updateSubOrderStatus": "Update item status"
   },
   "productType": {
-    "name": "Product Name",
-    "description": "Description",
-    "namePlaceholder": "e.g., Stickers, Banners",
-    "descriptionPlaceholder": "Optional description",
-    "add": "Add Product Type",
-    "adding": "Adding...",
-    "createCustom": "Create custom",
-    "errorName": "Product name is required",
-    "errorFailed": "Failed to add product type"
+    "mugs": "Mugs",
+    "t-shirts": "T-Shirts",
+    "tshirts": "T-Shirts",
+    "hoodies": "Hoodies",
+    "bags": "Bags",
+    "caps": "Caps",
+    "other": "Other"
   },
   "auth": {
     "signIn": "Sign In",
@@ -198,7 +196,21 @@
     "tabs": {
       "currentOrders": "Current Orders",
       "pastOrders": "Past Orders",
-      "invoicedOrders": "Invoiced"
+      "invoicedOrders": "Invoiced",
+      "trash": "Trash"
+    },
+    "trash": {
+      "title": "Trash",
+      "restore": "Restore",
+      "restoreConfirm": "Are you sure you want to restore this order? It will go back to the orders list.",
+      "restored": "Order restored",
+      "restoreError": "Failed to restore order. Please try again.",
+      "deletePermanently": "Delete permanently",
+      "deletePermanentlyConfirm": "Are you sure you want to permanently delete this order? This action cannot be undone.",
+      "deletedPermanently": "Order permanently deleted",
+      "deletedOn": "Deleted: {{date}} by {{user}}",
+      "empty": "Trash is empty",
+      "emptyDesc": "Deleted orders show up here and can be restored."
     },
     "pagination": {
       "showing": "Showing {{from}}-{{to}} of {{total}}",
@@ -222,7 +234,8 @@
       "quantityHigh": "Quantity (High to Low)",
       "quantityLow": "Quantity (Low to High)",
       "byStatus": "Status",
-      "status": "Status"
+      "month": "Month",
+      "allMonths": "All months"
     },
     "table": {
       "orderId": "Order ID",
@@ -304,7 +317,9 @@
         "delivered": "Handed Over",
         "invoiced": "Invoiced",
         "cancelled": "Cancelled"
-      }
+      },
+      "orderMovedToTrash": "Order moved to trash",
+      "deleteOrderTrashConfirm": "Are you sure you want to delete this order? It will be moved to the trash and can be restored from there."
     }
   },
   "orderStatus": {
@@ -315,15 +330,6 @@
     "delivered": "handed over",
     "invoiced": "invoiced",
     "cancelled": "cancelled"
-  },
-  "productType": {
-    "mugs": "Mugs",
-    "t-shirts": "T-Shirts",
-    "tshirts": "T-Shirts",
-    "hoodies": "Hoodies",
-    "bags": "Bags",
-    "caps": "Caps",
-    "other": "Other"
   },
   "placeOrder": {
     "title": "Order Details",
@@ -641,7 +647,7 @@
     "positioning": "Positioning",
     "length": "Length (cm)",
     "width": "Width (cm)",
-    "area": "Area (cm\u00b2)",
+    "area": "Area (cm²)",
     "cmp": "Cost/unit (RON)",
     "positionCost": "Position Cost (RON)",
     "department": "Department",

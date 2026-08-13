@@ -80,6 +80,12 @@ export default function AppShell({ children, title }: { children: React.ReactNod
       snapshot.docChanges().forEach((change) => {
         if (change.type === 'added') {
           const order = change.doc.data();
+
+          // Skip orders sitting in the trash
+          if (order.deletedAt) {
+            return;
+          }
+
           const orderAge = Date.now() - order.createdAt?.toMillis();
 
           // Don't show notification if current user created the order

@@ -9,6 +9,7 @@ import { useDepartments } from '../hooks/useDepartments';
 import { buildInvoiceData, downloadInvoice, sendInvoiceToClient } from '../services/invoiceService';
 import { uploadFile } from '../services/storageService';
 import { showSuccess, showError } from '../services/notificationService';
+import { moveOrderToTrash } from '../services/orderTrashService';
 import ConfirmDialog from './ConfirmDialog';
 import PositioningEditor from './PositioningEditor';
 import SubOrderItem, { SubOrderData } from './SubOrderItem';
@@ -341,30 +342,19 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
     if (!selectedOrder) return;
 
     try {
-      const subOrdersRef = collection(db, 'orders', selectedOrder.id, 'subOrders');
-      const subOrdersSnapshot = await getDocs(subOrdersRef);
-      await Promise.all(subOrdersSnapshot.docs.map(doc => deleteDoc(doc.ref)));
-
-      const updatesRef = collection(db, 'orderUpdates');
-      const updatesQuery = query(updatesRef, where('orderId', '==', selectedOrder.id));
-      const updatesSnapshot = await getDocs(updatesQuery);
-      await Promise.all(updatesSnapshot.docs.map(doc => deleteDoc(doc.ref)));
-
-      const notificationsRef = collection(db, 'notifications');
-      const notificationsQuery = query(notificationsRef, where('orderId', '==', selectedOrder.id));
-      const notificationsSnapshot = await getDocs(notificationsQuery);
-      await Promise.all(notificationsSnapshot.docs.map(doc => deleteDoc(doc.ref)));
-
-      const orderRef = doc(db, 'orders', selectedOrder.id);
-      await deleteDoc(orderRef);
+      // Soft delete - the order lands in the trash and can be restored from there
+      await moveOrderToTrash(selectedOrder.id, {
+        uid: currentUser!.uid,
+        name: userProfile?.displayName || currentUser!.displayName || currentUser!.email
+      });
 
       onClose();
       setShowDeleteDialog(false);
-      showSuccess(t('dashboard.orderModal.orderDeleted'));
+      showSuccess(t('dashboard.orderModal.orderMovedToTrash'));
       if (onOrderUpdated) onOrderUpdated();
     } catch (error: any) {
       if (import.meta.env.DEV) {
-        console.error('Error deleting order:', error);
+        console.error('Error moving order to trash:', error);
       }
       let errorMessage = t('dashboard.orderModal.deleteError');
       if (error?.code === 'permission-denied') {
@@ -1526,8 +1516,8 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
           isOpen={showDeleteDialog}
           onClose={() => setShowDeleteDialog(false)}
           onConfirm={deleteOrder}
-          title="Șterge comandă"
-          message="Sigur doriți să ștergeți această comandă? Această acțiune nu poate fi anulată."
+          title={t('dashboard.orderModal.deleteOrder')}
+          message={t('dashboard.orderModal.deleteOrderTrashConfirm')}
           confirmText="Șterge"
           cancelText="Anulează"
           type="danger"
