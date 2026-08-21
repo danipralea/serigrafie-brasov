@@ -66,6 +66,7 @@ export default function PlaceOrder() {
         clientEmail: currentUser.email || '',
         clientPhone: contactPhone || '',
         clientCompany: '',
+        clientCui: '',
         userId: currentUser.uid,
         userName: clientName,
         userEmail: currentUser.email,

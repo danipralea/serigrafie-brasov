@@ -6,6 +6,7 @@ const order = {
   orderName: 'Comanda test',
   clientName: 'Ion Popescu',
   clientCompany: 'ACME SRL',
+  clientCui: 'RO12345678',
   clientEmail: 'ion@example.com',
   createdAt: { toDate: () => new Date('2026-08-01') },
   updatedAt: { toDate: () => new Date('2026-08-05') },
@@ -36,6 +37,12 @@ describe('invoice', () => {
     expect(data.items[0].positioning?.[0].name).toBe('Piept');
     const out = generateInvoicePDF(data).output('arraybuffer');
     expect(out.byteLength).toBeGreaterThan(1000);
+  });
+
+  it('carries the client CUI onto the invoice', () => {
+    const data = buildInvoiceData(order);
+    expect(data.clientCui).toBe('RO12345678');
+    expect(buildInvoiceData({ id: 'z1', subOrders: [] }).clientCui).toBe('');
   });
 
   it('does not throw on an order with no items and no quantities', () => {

@@ -19,6 +19,7 @@ interface Client {
   email?: string;
   phone?: string;
   company?: string;
+  cui?: string;
   authUid?: string; // Firebase Auth UID of the client
 }
 
@@ -200,7 +201,8 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
         clientName: selectedClient.name,
         clientEmail: selectedClient.email || '',
         clientPhone: selectedClient.phone || contactPhone,
-        clientCompany: selectedClient.company || ''
+        clientCompany: selectedClient.company || '',
+        clientCui: selectedClient.cui || ''
       };
     } else {
       // Regular client - use their own info
@@ -212,7 +214,8 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
         clientName: clientName,
         clientEmail: currentUser.email || '',
         clientPhone: contactPhone || '',
-        clientCompany: ''
+        clientCompany: '',
+        clientCui: ''
       };
     }
 

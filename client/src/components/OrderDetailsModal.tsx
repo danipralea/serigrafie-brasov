@@ -6,7 +6,7 @@ import { collection, query, where, getDocs, doc, updateDoc, addDoc, deleteDoc, w
 import { PlusIcon } from '@heroicons/react/20/solid';
 import { OrderStatus } from '../types';
 import { useDepartments } from '../hooks/useDepartments';
-import { buildInvoiceData, downloadInvoice, sendInvoiceToClient } from '../services/invoiceService';
+import { buildInvoiceData, downloadInvoice, fetchClientCui, sendInvoiceToClient } from '../services/invoiceService';
 import { uploadFile } from '../services/storageService';
 import { showSuccess, showError } from '../services/notificationService';
 import { moveOrderToTrash } from '../services/orderTrashService';
@@ -392,6 +392,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
       orderName: selectedOrder.orderName || '',
       clientName: selectedOrder.clientName || '',
       clientCompany: selectedOrder.clientCompany || '',
+      clientCui: selectedOrder.clientCui || '',
       clientEmail: selectedOrder.clientEmail || '',
       clientPhone: selectedOrder.clientPhone || '',
     });
@@ -491,6 +492,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
       { key: 'orderName', label: t('order.orderName') },
       { key: 'clientName', label: t('clients.addModal.name') },
       { key: 'clientCompany', label: t('clients.addModal.company') },
+      { key: 'clientCui', label: t('clients.addModal.cui') },
       { key: 'clientEmail', label: t('clients.addModal.email') },
       { key: 'clientPhone', label: t('clients.addModal.phone') },
     ];
@@ -658,11 +660,20 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
     }
   }
 
-  function handleDownloadInvoice() {
+  /** Invoice payload, topped up with the client's CUI for older orders. */
+  async function buildInvoiceDataWithCui() {
+    const invoiceData = buildInvoiceData(selectedOrder);
+    if (!invoiceData.clientCui) {
+      invoiceData.clientCui = await fetchClientCui(selectedOrder.clientId);
+    }
+    return invoiceData;
+  }
+
+  async function handleDownloadInvoice() {
     if (!selectedOrder) return;
 
     try {
-      downloadInvoice(buildInvoiceData(selectedOrder));
+      downloadInvoice(await buildInvoiceDataWithCui());
     } catch (error) {
       if (import.meta.env.DEV) {
         console.error('Error downloading invoice:', error);
@@ -676,7 +687,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
 
     try {
       setSendingInvoice(true);
-      await sendInvoiceToClient(buildInvoiceData(selectedOrder));
+      await sendInvoiceToClient(await buildInvoiceDataWithCui());
       showSuccess(t('dashboard.orderModal.invoiceSent'));
     } catch (error) {
       if (import.meta.env.DEV) {
@@ -841,6 +852,16 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                       />
                     </div>
                     <div>
+                      <label className="block text-xs font-medium text-blue-800 dark:text-blue-300 mb-1">{t('clients.addModal.cui')}</label>
+                      <input
+                        type="text"
+                        value={editData.clientCui || ''}
+                        onChange={(e) => setEditData({ ...editData, clientCui: e.target.value })}
+                        placeholder={t('clients.addModal.cuiPlaceholder')}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      />
+                    </div>
+                    <div>
                       <label className="block text-xs font-medium text-blue-800 dark:text-blue-300 mb-1">{t('clients.addModal.email')}</label>
                       <input
                         type="email"
@@ -865,6 +886,9 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                       <div className="font-semibold text-blue-900 dark:text-blue-200">{getOrderClientPrimaryName(selectedOrder)}</div>
                       {getOrderClientSecondaryName(selectedOrder) && (
                         <div className="text-blue-800 dark:text-blue-300">{getOrderClientSecondaryName(selectedOrder)}</div>
+                      )}
+                      {selectedOrder.clientCui && (
+                        <div className="text-blue-700 dark:text-blue-400">{t('clients.addModal.cui')}: {selectedOrder.clientCui}</div>
                       )}
                       {selectedOrder.clientEmail && (
                         <div className="text-blue-700 dark:text-blue-400">{selectedOrder.clientEmail}</div>

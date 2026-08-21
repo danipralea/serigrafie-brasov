@@ -13,6 +13,7 @@ interface Client {
   email?: string;
   phone?: string;
   company?: string;
+  cui?: string;
 }
 
 interface ClientAutocompleteProps {
@@ -39,6 +40,7 @@ export default function ClientAutocomplete({ selectedClient, onSelectClient, err
     email: '',
     phone: '',
     company: '',
+    cui: '',
     address: '',
     notes: ''
   });
@@ -55,7 +57,8 @@ export default function ClientAutocomplete({ selectedClient, onSelectClient, err
         client.name?.toLowerCase().includes(query) ||
         client.email?.toLowerCase().includes(query) ||
         client.phone?.toLowerCase().includes(query) ||
-        client.company?.toLowerCase().includes(query)
+        client.company?.toLowerCase().includes(query) ||
+        client.cui?.toLowerCase().includes(query)
       );
       setFilteredClients(filtered);
       setShowDropdown(true);
@@ -137,7 +140,8 @@ export default function ClientAutocomplete({ selectedClient, onSelectClient, err
         name: newClient.name,
         email: newClient.email,
         phone: newClient.phone,
-        company: newClient.company
+        company: newClient.company,
+        cui: newClient.cui
       };
 
       // Add to local state
@@ -153,6 +157,7 @@ export default function ClientAutocomplete({ selectedClient, onSelectClient, err
         email: '',
         phone: '',
         company: '',
+        cui: '',
         address: '',
         notes: ''
       });
@@ -310,6 +315,19 @@ export default function ClientAutocomplete({ selectedClient, onSelectClient, err
               />
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {t('clients.addModal.cui')}
+              </label>
+              <input
+                type="text"
+                value={newClient.cui}
+                onChange={(e) => setNewClient({ ...newClient, cui: e.target.value })}
+                placeholder={t('clients.addModal.cuiPlaceholder')}
+                className="block w-full rounded-md bg-white dark:bg-slate-700 px-3 py-2 text-sm text-gray-900 dark:text-white outline-1 -outline-offset-1 outline-gray-300 dark:outline-slate-600 focus:outline-2 focus:-outline-offset-2 focus:outline-blue-500 transition-colors"
+              />
+            </div>
+
             {/* Invite Client Toggle */}
             <div className="flex items-center justify-between py-2">
               <div className="flex items-center gap-3">
@@ -350,6 +368,7 @@ export default function ClientAutocomplete({ selectedClient, onSelectClient, err
                     email: '',
                     phone: '',
                     company: '',
+                    cui: '',
                     address: '',
                     notes: ''
                   });

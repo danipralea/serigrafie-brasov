@@ -108,6 +108,7 @@ export default function Clients() {
             email: userData.email,
             phone: null,
             company: null,
+            cui: null,
             address: null,
             notes: null,
             createdAt: { toMillis: () => Date.now() }, // We don't have the real date
@@ -126,7 +127,8 @@ export default function Clients() {
         client.name?.toLowerCase().includes(query) ||
         client.email?.toLowerCase().includes(query) ||
         client.phone?.toLowerCase().includes(query) ||
-        client.company?.toLowerCase().includes(query)
+        client.company?.toLowerCase().includes(query) ||
+        client.cui?.toLowerCase().includes(query)
       );
     }
 

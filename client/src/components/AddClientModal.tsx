@@ -12,6 +12,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }) {
     email: '',
     phone: '',
     company: '',
+    cui: '',
     address: '',
     notes: ''
   });
@@ -83,6 +84,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }) {
         email: formData.email.trim().toLowerCase(),
         phone: formData.phone.trim(),
         company: formData.company.trim(),
+        cui: formData.cui.trim(),
         address: formData.address.trim(),
         notes: formData.notes.trim(),
         authUid: authUid, // Store the client's Auth UID if found
@@ -98,6 +100,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }) {
         email: '',
         phone: '',
         company: '',
+        cui: '',
         address: '',
         notes: ''
       });
@@ -122,6 +125,7 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }) {
       email: '',
       phone: '',
       company: '',
+      cui: '',
       address: '',
       notes: ''
     });
@@ -232,6 +236,22 @@ export default function AddClientModal({ isOpen, onClose, onClientAdded }) {
                   value={formData.company}
                   onChange={handleChange}
                   placeholder={t('clients.addModal.companyPlaceholder')}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                />
+              </div>
+
+              {/* CUI / Tax ID */}
+              <div>
+                <label htmlFor="cui" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                  {t('clients.addModal.cui')}
+                </label>
+                <input
+                  type="text"
+                  id="cui"
+                  name="cui"
+                  value={formData.cui}
+                  onChange={handleChange}
+                  placeholder={t('clients.addModal.cuiPlaceholder')}
                   className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 />
               </div>

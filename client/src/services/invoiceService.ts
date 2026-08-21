@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { collection, addDoc, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, doc as docRef, getDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { formatDate } from '../utils/dateUtils';
 import {
@@ -27,6 +27,8 @@ export interface InvoiceData {
   clientEmail?: string;
   clientPhone?: string;
   clientCompany?: string;
+  /** Romanian tax id (CUI / cod fiscal) of the client's company. */
+  clientCui?: string;
   items: InvoiceItem[];
   createdAt?: Date;
   completedAt?: Date;
@@ -65,6 +67,7 @@ export function buildInvoiceData(order: any): InvoiceData {
     orderName: order?.orderName || '',
     clientName: order?.clientName || order?.userName || order?.userEmail || 'Client',
     clientCompany: order?.clientCompany || '',
+    clientCui: order?.clientCui || '',
     clientEmail: order?.clientEmail || order?.userEmail || '',
     clientPhone: order?.clientPhone || order?.contactPhone || '',
     items: subOrders.map((subOrder) => ({
@@ -76,6 +79,20 @@ export function buildInvoiceData(order: any): InvoiceData {
     createdAt: order?.createdAt?.toDate?.(),
     completedAt: order?.updatedAt?.toDate?.()
   };
+}
+
+/**
+ * Reads the CUI from the client record. Orders placed before the field existed
+ * carry no `clientCui`, so the invoice falls back to the client sheet.
+ */
+export async function fetchClientCui(clientId?: string): Promise<string> {
+  if (!clientId) return '';
+  try {
+    const snapshot = await getDoc(docRef(db, 'clients', clientId));
+    return snapshot.exists() ? snapshot.data()?.cui || '' : '';
+  } catch {
+    return '';
+  }
 }
 
 export function generateInvoicePDF(invoiceData: InvoiceData): jsPDF {
@@ -122,6 +139,10 @@ export function generateInvoicePDF(invoiceData: InvoiceData): jsPDF {
   if (invoiceData.clientCompany) {
     y += 7;
     doc.text(`Firma / Company: ${invoiceData.clientCompany}`, 20, y);
+  }
+  if (invoiceData.clientCui) {
+    y += 7;
+    doc.text(`CUI / Tax ID: ${invoiceData.clientCui}`, 20, y);
   }
   if (invoiceData.clientEmail) {
     y += 7;
