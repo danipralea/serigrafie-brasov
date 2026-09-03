@@ -37,6 +37,8 @@
     "addItem": "Add Item",
     "subOrderItem": "Item",
     "removeSubOrder": "Remove Item",
+    "collapseSubOrder": "Collapse item",
+    "expandSubOrder": "Expand item",
     "contactPhone": "Contact Phone",
     "contactPhoneHelp": "Override client's phone number if different for this order",
     "department": "Department",

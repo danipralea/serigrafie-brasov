@@ -11,6 +11,7 @@ import AppShell from '../components/AppShell';
 import Navigation from '../components/Navigation';
 import SubOrderItem, { SubOrderData } from '../components/SubOrderItem';
 import { toStoredPositioning } from '../utils/positioning';
+import { useCollapsedItems } from '../hooks/useCollapsedItems';
 import { PlusIcon } from '@heroicons/react/20/solid';
 
 export default function PlaceOrder() {
@@ -162,6 +163,9 @@ export default function PlaceOrder() {
     }
   }, [error]);
 
+  // Collapse state so long orders with many items stay navigable
+  const { isCollapsed, toggle: toggleCollapsed, collapse, expand } = useCollapsedItems();
+
   function handleSubOrderChange(id: string, field: string, value: any) {
     setSubOrders(prev =>
       prev.map(so => (so.id === id ? { ...so, [field]: value } : so))
@@ -169,6 +173,8 @@ export default function PlaceOrder() {
   }
 
   function handleAddSubOrder() {
+    // Collapse the items already filled in so the new one is the only one open
+    collapse(subOrders.map(so => so.id));
     setSubOrders(prev => [
       ...prev,
       {
@@ -199,23 +205,29 @@ export default function PlaceOrder() {
     for (let i = 0; i < subOrders.length; i++) {
       const so = subOrders[i];
 
+      const failValidation = (message: string) => {
+        // Make sure the offending item is visible
+        expand(so.id);
+        setError(`${t('order.subOrderItem')} #${i + 1}: ${message}`);
+      };
+
       if (!so.productType) {
-        setError(`${t('order.subOrderItem')} #${i + 1}: ${t('order.errorProductTypeRequired')}`);
+        failValidation(t('order.errorProductTypeRequired'));
         return false;
       }
 
       if (!so.positioning || so.positioning.length === 0) {
-        setError(`${t('order.subOrderItem')} #${i + 1}: ${t('order.errorPositioningRequired')}`);
+        failValidation(t('order.errorPositioningRequired'));
         return false;
       }
 
       if (!so.quantity || parseInt(so.quantity) <= 0) {
-        setError(`${t('order.subOrderItem')} #${i + 1}: ${t('order.errorQuantityRequired')}`);
+        failValidation(t('order.errorQuantityRequired'));
         return false;
       }
 
       if (!so.deliveryTime || !so.deliveryTime.trim()) {
-        setError(`${t('order.subOrderItem')} #${i + 1}: ${t('order.errorDeliveryTimeRequired')}`);
+        failValidation(t('order.errorDeliveryTimeRequired'));
         return false;
       }
     }
@@ -304,6 +316,8 @@ export default function PlaceOrder() {
                       onChange={handleSubOrderChange}
                       onRemove={handleRemoveSubOrder}
                       canRemove={subOrders.length > 1}
+                      collapsed={isCollapsed(subOrder.id)}
+                      onToggleCollapse={toggleCollapsed}
                     />
                   </div>
                 ))}
@@ -402,6 +416,8 @@ export default function PlaceOrder() {
                     onChange={handleSubOrderChange}
                     onRemove={handleRemoveSubOrder}
                     canRemove={subOrders.length > 1}
+                    collapsed={isCollapsed(subOrder.id)}
+                    onToggleCollapse={toggleCollapsed}
                   />
                 </div>
               ))}

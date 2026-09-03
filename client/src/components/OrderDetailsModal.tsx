@@ -3,9 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { useAuth, hasTeamAccess, hasAdminAccess } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, doc, updateDoc, addDoc, deleteDoc, writeBatch, Timestamp } from 'firebase/firestore';
-import { PlusIcon } from '@heroicons/react/20/solid';
+import { PlusIcon, ChevronDownIcon } from '@heroicons/react/20/solid';
 import { OrderStatus } from '../types';
 import { useDepartments } from '../hooks/useDepartments';
+import { useCollapsedItems } from '../hooks/useCollapsedItems';
 import { buildInvoiceData, downloadInvoice, fetchClientCui, sendInvoiceToClient } from '../services/invoiceService';
 import { uploadFile } from '../services/storageService';
 import { showSuccess, showError } from '../services/notificationService';
@@ -55,6 +56,8 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
   const [newSubOrders, setNewSubOrders] = useState<SubOrderData[]>([]);
   const [editError, setEditError] = useState('');
   const { departments } = useDepartments();
+  // Collapse state so orders with many items stay easy to navigate
+  const { isCollapsed, toggle: toggleCollapsed, collapse: collapseItems, expand: expandItem } = useCollapsedItems();
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -437,6 +440,11 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
   }
 
   function addNewSubOrder() {
+    // Collapse the items already on screen so the new one is the only one open
+    collapseItems([
+      ...(selectedOrder?.subOrders || []).map((so: any) => so.id),
+      ...newSubOrders.map(so => so.id)
+    ]);
     setNewSubOrders(prev => [...prev, createEmptySubOrder()]);
     // The new item is appended at the bottom of a long modal, so bring it into
     // view, clear of the sticky header.
@@ -459,10 +467,16 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
       const so = newSubOrders[i];
       const label = `${t('order.subOrderItem')} #${(selectedOrder.subOrders?.length || 0) + i + 1}`;
 
-      if (!so.productType) return `${label}: ${t('order.errorProductTypeRequired')}`;
-      if (!so.positioning || so.positioning.length === 0) return `${label}: ${t('order.errorPositioningRequired')}`;
-      if (!so.quantity || parseInt(so.quantity) <= 0) return `${label}: ${t('order.errorQuantityRequired')}`;
-      if (!so.deliveryTime || !so.deliveryTime.trim()) return `${label}: ${t('order.errorDeliveryTimeRequired')}`;
+      // Make sure the offending item is visible before reporting the error
+      const fail = (message: string) => {
+        expandItem(so.id);
+        return `${label}: ${message}`;
+      };
+
+      if (!so.productType) return fail(t('order.errorProductTypeRequired'));
+      if (!so.positioning || so.positioning.length === 0) return fail(t('order.errorPositioningRequired'));
+      if (!so.quantity || parseInt(so.quantity) <= 0) return fail(t('order.errorQuantityRequired'));
+      if (!so.deliveryTime || !so.deliveryTime.trim()) return fail(t('order.errorDeliveryTimeRequired'));
     }
     return '';
   }
@@ -940,14 +954,32 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
 
                     return (
                       <div key={subOrder.id} className="bg-gray-50 dark:bg-slate-700 rounded-lg p-4 border border-gray-200 dark:border-slate-600">
-                        <div className="flex items-center justify-between mb-3">
-                          <h5 className="text-sm font-semibold text-gray-900 dark:text-white">
-                            {t('order.subOrderItem')} #{index + 1}
-                          </h5>
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(subOrder.status)}`}>
+                        <button
+                          data-testid={`order-item-collapse-toggle-${index}`}
+                          type="button"
+                          onClick={() => toggleCollapsed(subOrder.id)}
+                          aria-expanded={!isCollapsed(subOrder.id)}
+                          title={isCollapsed(subOrder.id) ? t('order.expandSubOrder') : t('order.collapseSubOrder')}
+                          className={`flex w-full items-center justify-between gap-2 text-left ${isCollapsed(subOrder.id) ? '' : 'mb-3'}`}
+                        >
+                          <span className="flex items-center gap-2 min-w-0">
+                            <ChevronDownIcon
+                              className={`w-5 h-5 flex-shrink-0 text-gray-500 dark:text-slate-400 transition-transform ${isCollapsed(subOrder.id) ? '-rotate-90' : ''}`}
+                            />
+                            <h5 className="text-sm font-semibold text-gray-900 dark:text-white flex-shrink-0">
+                              {t('order.subOrderItem')} #{index + 1}
+                            </h5>
+                            {(subOrder.productTypeName || subOrder.productType) && (
+                              <span className="text-sm text-gray-600 dark:text-slate-300 truncate">
+                                {subOrder.productTypeName || subOrder.productType}
+                              </span>
+                            )}
+                          </span>
+                          <span className={`flex-shrink-0 px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(subOrder.status)}`}>
                             {getStatusLabel(subOrder.status)}
                           </span>
-                        </div>
+                        </button>
+                        <div className={isCollapsed(subOrder.id) ? 'hidden' : ''}>
 
                         {isEditing && editSub ? (
                           <div className="space-y-3 text-sm">
@@ -1167,6 +1199,7 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                             </div>
                           </div>
                         )}
+                        </div>
                       </div>
                     );
                   })}
@@ -1185,6 +1218,8 @@ export default function OrderDetailsModal({ isOpen, onClose, order, onOrderUpdat
                         onRemove={(id) => setNewSubOrders(prev => prev.filter(so => so.id !== id))}
                         canRemove={true}
                         departments={departments}
+                        collapsed={isCollapsed(subOrder.id)}
+                        onToggleCollapse={toggleCollapsed}
                       />
                     </div>
                   ))}

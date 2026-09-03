@@ -293,6 +293,8 @@
     "addItem": "Adaugă articol",
     "subOrderItem": "Articol",
     "removeSubOrder": "Șterge articol",
+    "collapseSubOrder": "Restrânge articolul",
+    "expandSubOrder": "Extinde articolul",
     "contactPhone": "Telefon contact",
     "contactPhoneHelp": "Lasă gol pentru a folosi numărul de telefon al clientului",
     "department": "Departament",

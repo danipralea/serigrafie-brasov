@@ -1,11 +1,13 @@
 import { useState, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PhotoIcon, TrashIcon } from '@heroicons/react/24/solid';
+import { ChevronDownIcon } from '@heroicons/react/20/solid';
 import ProductTypeAutocomplete from './ProductTypeAutocomplete';
 import { uploadFile } from '../services/storageService';
 import { useAuth, hasTeamAccess } from '../contexts/AuthContext';
 import PositioningEditor from './PositioningEditor';
 import { PositionFormEntry } from '../utils/positioning';
+import { OrderStatus } from '../types';
 
 interface ProductTypeOption {
   id: string;
@@ -44,13 +46,48 @@ interface SubOrderItemProps {
   onRemove: (id: string) => void;
   canRemove: boolean;
   departments?: Department[];
+  /** Controlled collapse state. When omitted the item manages its own state. */
+  collapsed?: boolean;
+  onToggleCollapse?: (id: string) => void;
 }
 
-function SubOrderItem({ subOrder, index, onChange, onRemove, canRemove, departments = [] }: SubOrderItemProps) {
+const STATUS_BADGE_COLORS: { [key: string]: string } = {
+  [OrderStatus.PENDING_CONFIRMATION]: 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300',
+  [OrderStatus.PENDING]: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300',
+  [OrderStatus.IN_PROGRESS]: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300',
+  [OrderStatus.COMPLETED]: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300',
+  [OrderStatus.DELIVERED]: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300',
+  [OrderStatus.INVOICED]: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300',
+  [OrderStatus.CANCELLED]: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+};
+
+const STATUS_LABEL_KEYS: { [key: string]: string } = {
+  [OrderStatus.PENDING_CONFIRMATION]: 'dashboard.orderModal.statuses.pendingConfirmation',
+  [OrderStatus.PENDING]: 'dashboard.orderModal.statuses.confirmed',
+  [OrderStatus.IN_PROGRESS]: 'dashboard.orderModal.statuses.inProduction',
+  [OrderStatus.COMPLETED]: 'dashboard.orderModal.statuses.completed',
+  [OrderStatus.DELIVERED]: 'dashboard.orderModal.statuses.delivered',
+  [OrderStatus.INVOICED]: 'dashboard.orderModal.statuses.invoiced',
+  [OrderStatus.CANCELLED]: 'dashboard.orderModal.statuses.cancelled'
+};
+
+function SubOrderItem({ subOrder, index, onChange, onRemove, canRemove, departments = [], collapsed, onToggleCollapse }: SubOrderItemProps) {
   const { t } = useTranslation();
   const { currentUser, userProfile } = useAuth();
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [internalCollapsed, setInternalCollapsed] = useState(false);
+
+  const isControlled = collapsed !== undefined;
+  const isCollapsed = isControlled ? collapsed : internalCollapsed;
+
+  function toggleCollapsed() {
+    if (isControlled) {
+      onToggleCollapse?.(subOrder.id);
+    } else {
+      setInternalCollapsed(prev => !prev);
+    }
+  }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -84,17 +121,43 @@ function SubOrderItem({ subOrder, index, onChange, onRemove, canRemove, departme
 
   return (
     <div className="border border-gray-300 dark:border-slate-600 rounded-lg p-4 bg-gray-50 dark:bg-slate-700/50">
-      {/* Header with index and remove button */}
-      <div className="flex items-center justify-between mb-4">
-        <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
-          {t('order.subOrderItem')} #{index + 1}
-        </h4>
+      {/* Header: collapse toggle, summary and remove button */}
+      <div className={`flex items-center justify-between gap-2 ${isCollapsed ? '' : 'mb-4'}`}>
+        <button
+          data-testid={`sub-order-collapse-toggle-${index}`}
+          type="button"
+          onClick={toggleCollapsed}
+          aria-expanded={!isCollapsed}
+          title={isCollapsed ? t('order.expandSubOrder') : t('order.collapseSubOrder')}
+          className="flex items-center gap-2 flex-1 min-w-0 text-left rounded-md py-0.5 -my-0.5 focus:outline-none focus-visible:outline-2 focus-visible:outline-blue-500"
+        >
+          <ChevronDownIcon
+            className={`w-5 h-5 flex-shrink-0 text-gray-500 dark:text-slate-400 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+          />
+          <h4 className="text-sm font-semibold text-gray-900 dark:text-white flex-shrink-0">
+            {t('order.subOrderItem')} #{index + 1}
+          </h4>
+          {subOrder.productType?.name && (
+            <span className="text-sm text-gray-600 dark:text-slate-300 truncate">
+              {subOrder.productType.name}
+            </span>
+          )}
+          {subOrder.status && (
+            <span
+              className={`flex-shrink-0 px-2 py-0.5 text-xs font-semibold rounded-full ${
+                STATUS_BADGE_COLORS[subOrder.status] || 'bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-slate-300'
+              }`}
+            >
+              {STATUS_LABEL_KEYS[subOrder.status] ? t(STATUS_LABEL_KEYS[subOrder.status]) : subOrder.status}
+            </span>
+          )}
+        </button>
         {canRemove && (
           <button
             data-testid={`sub-order-remove-button-${index}`}
             type="button"
             onClick={() => onRemove(subOrder.id)}
-            className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md transition-colors"
+            className="flex-shrink-0 p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md transition-colors"
             title={t('order.removeSubOrder')}
           >
             <TrashIcon className="w-5 h-5" />
@@ -102,7 +165,7 @@ function SubOrderItem({ subOrder, index, onChange, onRemove, canRemove, departme
         )}
       </div>
 
-      <div className="space-y-4">
+      <div className={`space-y-4 ${isCollapsed ? 'hidden' : ''}`}>
         {/* Product Type */}
         <div>
           <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">

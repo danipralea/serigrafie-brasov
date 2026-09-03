@@ -10,6 +10,7 @@ import { OrderStatus } from '../types';
 import ClientAutocomplete from './ClientAutocomplete';
 import SubOrderItem, { SubOrderData } from './SubOrderItem';
 import { useDepartments } from '../hooks/useDepartments';
+import { useCollapsedItems } from '../hooks/useCollapsedItems';
 import { toStoredPositioning } from '../utils/positioning';
 import { getClientPrimaryName, getClientSecondaryName } from '../utils/clientDisplay';
 
@@ -80,6 +81,9 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
     }
   ]);
 
+  // Collapse state so long orders with many items stay navigable
+  const { isCollapsed, toggle: toggleCollapsed, collapse, expand, reset: resetCollapsed } = useCollapsedItems();
+
   function handleSubOrderChange(id: string, field: string, value: any) {
     setSubOrders(prev =>
       prev.map(so => (so.id === id ? { ...so, [field]: value } : so))
@@ -87,6 +91,8 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
   }
 
   function handleAddSubOrder() {
+    // Collapse the items already filled in so the new one is the only one open
+    collapse(subOrders.map(so => so.id));
     setSubOrders(prev => [
       ...prev,
       {
@@ -133,23 +139,29 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
     for (let i = 0; i < subOrders.length; i++) {
       const so = subOrders[i];
 
+      const failValidation = (message: string) => {
+        // Make sure the offending item is visible
+        expand(so.id);
+        setError(`${t('order.subOrderItem')} #${i + 1}: ${message}`);
+      };
+
       if (!so.productType) {
-        setError(`${t('order.subOrderItem')} #${i + 1}: ${t('order.errorProductTypeRequired')}`);
+        failValidation(t('order.errorProductTypeRequired'));
         return false;
       }
 
       if (!so.positioning || so.positioning.length === 0) {
-        setError(`${t('order.subOrderItem')} #${i + 1}: ${t('order.errorPositioningRequired')}`);
+        failValidation(t('order.errorPositioningRequired'));
         return false;
       }
 
       if (!so.quantity || parseInt(so.quantity) <= 0) {
-        setError(`${t('order.subOrderItem')} #${i + 1}: ${t('order.errorQuantityRequired')}`);
+        failValidation(t('order.errorQuantityRequired'));
         return false;
       }
 
       if (!so.deliveryTime || !so.deliveryTime.trim()) {
-        setError(`${t('order.subOrderItem')} #${i + 1}: ${t('order.errorDeliveryTimeRequired')}`);
+        failValidation(t('order.errorDeliveryTimeRequired'));
         return false;
       }
     }
@@ -307,6 +319,7 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
           notes: ''
         }
       ]);
+      resetCollapsed();
 
       onSuccess({ id: orderRef.id, ...orderData });
       onClose();
@@ -511,6 +524,8 @@ export default function PlaceOrderModal({ open, onClose, onSuccess }: PlaceOrder
                       onRemove={handleRemoveSubOrder}
                       canRemove={subOrders.length > 1}
                       departments={departments}
+                      collapsed={isCollapsed(subOrder.id)}
+                      onToggleCollapse={toggleCollapsed}
                     />
                   </div>
                 ))}
