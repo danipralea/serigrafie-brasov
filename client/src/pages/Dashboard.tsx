@@ -2,22 +2,22 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth, hasTeamAccess, hasAdminAccess } from '../contexts/AuthContext';
-import { db } from '../firebase';
-import { collection, query, where, getDocs, orderBy as firestoreOrderBy, doc, updateDoc, addDoc, deleteDoc, Timestamp, onSnapshot } from 'firebase/firestore';
 import { OrderStatus } from '../types';
 import { formatPositioning, normalizePositioning } from '../utils/positioning';
 import { getOrderClientPrimaryName, getOrderClientSecondaryName } from '../utils/clientDisplay';
 import { useDepartments } from '../hooks/useDepartments';
-import InviteTeamModal from '../components/InviteTeamModal';
+import { useOrders } from '../hooks/useOrders';
 import PlaceOrderModal from '../components/PlaceOrderModal';
-import Notifications from '../components/Notifications';
 import ConfirmDialog from '../components/ConfirmDialog';
 import AppShell from '../components/AppShell';
 import OrderDetailsModal from '../components/OrderDetailsModal';
+import AddToInvoiceModal from '../components/AddToInvoiceModal';
+import Pagination from '../components/Pagination';
 import { exportOrdersToExcel } from '../services/reportService';
-import { uploadFile } from '../services/storageService';
 import { showSuccess, showError } from '../services/notificationService';
 import { isOrderInTrash, restoreOrderFromTrash, deleteOrderPermanently } from '../services/orderTrashService';
+import { subscribeToInvoices } from '../services/invoicingService';
+import { formatMoney, getClientGroupKey, getOrderTotal, isOrderBillable } from '../utils/invoicing';
 import { formatDate } from '../utils/dateUtils';
 
 export default function Dashboard() {
@@ -25,22 +25,18 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
   const { t, i18n } = useTranslation();
-  const [orders, setOrders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showInviteModal, setShowInviteModal] = useState(false);
+  // Orders (with their sub-orders) come from the shared listener.
+  const { orders, loading } = useOrders();
   const [showPlaceOrderModal, setShowPlaceOrderModal] = useState(false);
   const [initialOrderData, setInitialOrderData] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
-  const [updateText, setUpdateText] = useState('');
-  const [postingUpdate, setPostingUpdate] = useState(false);
-  const [orderUpdates, setOrderUpdates] = useState<any[]>([]);
-  const [attachmentFile, setAttachmentFile] = useState(null);
-  const [uploadingAttachment, setUploadingAttachment] = useState(false);
-  const attachmentInputRef = useRef(null);
-  const updatesEndRef = useRef(null);
-  const [showDeleteUpdateDialog, setShowDeleteUpdateDialog] = useState(false);
-  const [selectedUpdateId, setSelectedUpdateId] = useState(null);
+
+  // Invoicing: bulk selection of finished orders, plus the invoices they can
+  // be added to.
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+  const [showAddToInvoice, setShowAddToInvoice] = useState(false);
+  const [invoices, setInvoices] = useState<any[]>([]);
 
   // Tab and filter states
   const [activeTab, setActiveTab] = useState('current'); // 'current', 'past', 'invoiced' or 'trash'
@@ -75,115 +71,19 @@ export default function Dashboard() {
     });
   }, []);
 
-  const fetchOrderUpdates = useCallback(async (orderId) => {
-    try {
-      const updatesRef = collection(db, 'orderUpdates');
-      const q = query(
-        updatesRef,
-        where('orderId', '==', orderId)
-      );
-      const snapshot = await getDocs(q);
-      const updates = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-
-      // Sort in memory instead of using Firestore orderBy to avoid index requirement
-      updates.sort((a, b) => {
-        const timeA = a.createdAt?.toMillis() || 0;
-        const timeB = b.createdAt?.toMillis() || 0;
-        return timeA - timeB; // asc order (oldest first, like a chat conversation)
-      });
-
-      setOrderUpdates(updates);
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error('Error fetching order updates:', error);
-      }
-      showError(`Error fetching updates: ${(error as any).message}`);
-      // Set empty array on error so UI still works
-      setOrderUpdates([]);
-    }
-  }, []);
-
-  const openOrderDetails = useCallback(async (order) => {
+  const openOrderDetails = useCallback((order) => {
     setSelectedOrder(order);
     setShowOrderModal(true);
-    await fetchOrderUpdates(order.id);
-  }, [fetchOrderUpdates]);
+  }, []);
 
+  // Invoices are only needed to offer an existing draft as a destination.
   useEffect(() => {
-    if (!currentUser || !userProfile) return;
+    if (!currentUser || !hasTeamAccess(userProfile)) return;
 
-    // Set up real-time listener for orders
-    const ordersRef = collection(db, 'orders');
-    let q;
-
-    // Team members see all orders
-    if (hasTeamAccess(userProfile)) {
-      q = query(
-        ordersRef,
-        firestoreOrderBy('createdAt', 'desc')
-      );
-    } else {
-      // Regular clients only see their own orders
-      q = query(
-        ordersRef,
-        where('userId', '==', currentUser.uid)
-      );
-    }
-
-    setLoading(true);
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-      // Fetch orders with their sub-orders
-      const ordersWithSubOrders = await Promise.all(
-        snapshot.docs.map(async (orderDoc) => {
-          const orderData = {
-            id: orderDoc.id,
-            ...orderDoc.data()
-          };
-
-          // Fetch sub-orders for this order
-          try {
-            const subOrdersRef = collection(db, 'orders', orderDoc.id, 'subOrders');
-            const subOrdersSnapshot = await getDocs(subOrdersRef);
-            const subOrders = subOrdersSnapshot.docs.map(subDoc => ({
-              id: subDoc.id,
-              ...subDoc.data()
-            }));
-
-            return {
-              ...orderData,
-              subOrders: subOrders || []
-            };
-          } catch (error) {
-            if (import.meta.env.DEV) {
-              console.error(`Error fetching sub-orders for order ${orderDoc.id}:`, error);
-            }
-            return {
-              ...orderData,
-              subOrders: []
-            };
-          }
-        })
-      );
-
-      // Sort in memory for client queries (to avoid composite index requirement)
-      if (!hasTeamAccess(userProfile)) {
-        ordersWithSubOrders.sort((a, b) => {
-          const timeA = a.createdAt?.toMillis() || 0;
-          const timeB = b.createdAt?.toMillis() || 0;
-          return timeB - timeA; // desc order
-        });
-      }
-
-      setOrders(ordersWithSubOrders);
-      setLoading(false);
-    }, (error) => {
+    const unsubscribe = subscribeToInvoices(setInvoices, (error) => {
       if (import.meta.env.DEV) {
-        console.error('Error fetching orders:', error);
+        console.error('Error loading invoices:', error);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -214,13 +114,6 @@ export default function Dashboard() {
       return () => document.removeEventListener('keydown', handleEscapeKey);
     }
   }, [selectedOrder]);
-
-  // Auto-scroll to latest update
-  useEffect(() => {
-    if (orderUpdates.length > 0 && updatesEndRef.current) {
-      updatesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [orderUpdates]);
 
   // Deleted orders live in the trash until they are purged from there
   const activeOrders = useMemo(() => orders.filter(order => !isOrderInTrash(order)), [orders]);
@@ -402,25 +295,6 @@ export default function Dashboard() {
     return filteredOrders.slice(start, start + ORDERS_PER_PAGE);
   }, [filteredOrders, isPaginated, currentPage]);
 
-  // Page buttons: first and last are always shown, the current page keeps a
-  // neighbour on each side, and the skipped ranges collapse into a gap
-  const pageNumbers = useMemo(() => {
-    if (totalPages <= 7) {
-      return Array.from({ length: totalPages }, (_, i) => i + 1);
-    }
-
-    const pages: (number | 'gap')[] = [1];
-    const start = Math.max(2, currentPage - 1);
-    const end = Math.min(totalPages - 1, currentPage + 1);
-
-    if (start > 2) pages.push('gap');
-    for (let page = start; page <= end; page++) pages.push(page);
-    if (end < totalPages - 1) pages.push('gap');
-    pages.push(totalPages);
-
-    return pages;
-  }, [currentPage, totalPages]);
-
   function goToPage(page: number) {
     const target = Math.min(Math.max(page, 1), totalPages);
     if (target === currentPage) return;
@@ -428,169 +302,65 @@ export default function Dashboard() {
     tableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  // --- Invoicing selection -------------------------------------------------
+  // Only the past tab can hold billable work, so the checkbox column appears
+  // there and nowhere else. Rows that cannot be billed keep a disabled box with
+  // an explanation rather than disappearing.
+  const canSelectOrders = hasTeamAccess(userProfile) && activeTab === 'past';
+
+  const selectableVisibleOrders = useMemo(
+    () => (canSelectOrders ? visibleOrders.filter(isOrderBillable) : []),
+    [canSelectOrders, visibleOrders]
+  );
+
+  const selectedOrders = useMemo(
+    () => activeOrders.filter(order => selectedOrderIds.includes(order.id)),
+    [activeOrders, selectedOrderIds]
+  );
+
+  const selectionTotal = useMemo(() => {
+    const totals = selectedOrders
+      .map(getOrderTotal)
+      .filter((value): value is number => value !== null);
+    if (totals.length === 0) return null;
+    return Math.round(totals.reduce((sum, value) => sum + value, 0) * 100) / 100;
+  }, [selectedOrders]);
+
+  const selectedClientCount = useMemo(
+    () => new Set(selectedOrders.map(getClientGroupKey)).size,
+    [selectedOrders]
+  );
+
+  const allVisibleSelected =
+    selectableVisibleOrders.length > 0 &&
+    selectableVisibleOrders.every(order => selectedOrderIds.includes(order.id));
+
+  // Selecting across a filter change would hide what is about to be invoiced.
+  useEffect(() => {
+    setSelectedOrderIds([]);
+  }, [activeTab, statusFilter, departmentFilter, monthFilter, searchQuery]);
+
+  function toggleOrderSelection(orderId: string) {
+    setSelectedOrderIds(previous =>
+      previous.includes(orderId)
+        ? previous.filter(id => id !== orderId)
+        : [...previous, orderId]
+    );
+  }
+
+  function toggleSelectAllVisible() {
+    const visibleIds = selectableVisibleOrders.map(order => order.id);
+    setSelectedOrderIds(previous =>
+      allVisibleSelected
+        ? previous.filter(id => !visibleIds.includes(id))
+        : [...new Set([...previous, ...visibleIds])]
+    );
+  }
+
   function handleReorder(e, order) {
     e.stopPropagation(); // Prevent row click from opening order details
     setInitialOrderData(order);
     setShowPlaceOrderModal(true);
-  }
-
-  function getInitials(name, email) {
-    if (name && name.trim()) {
-      const parts = name.trim().split(' ');
-      if (parts.length >= 2) {
-        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-      }
-      return name.substring(0, 2).toUpperCase();
-    }
-    if (email) {
-      return email.substring(0, 2).toUpperCase();
-    }
-    return 'U';
-  }
-
-  async function postUpdate() {
-    // Check if there's either text or attachment
-    if ((!updateText.trim() && !attachmentFile) || !selectedOrder) return;
-
-    try {
-      setPostingUpdate(true);
-
-      let attachmentURL = null;
-      let attachmentName = null;
-      let attachmentType = null;
-
-      // Upload attachment if present
-      if (attachmentFile) {
-        try {
-          setUploadingAttachment(true);
-          const result = await uploadFile(attachmentFile, 'updates', currentUser.uid);
-          attachmentURL = result.url;
-          attachmentName = result.name;
-          attachmentType = result.type;
-        } catch (uploadError) {
-          if (import.meta.env.DEV) {
-            console.error('Error uploading attachment:', uploadError);
-          }
-          showError(t('dashboard.orderModal.attachmentUploadFailed'));
-        } finally {
-          setUploadingAttachment(false);
-        }
-      }
-
-      const updatesRef = collection(db, 'orderUpdates');
-      const updateData = {
-        orderId: selectedOrder.id,
-        userId: currentUser.uid,
-        userName: userProfile?.displayName || currentUser.displayName || currentUser.email || 'Unknown',
-        userEmail: currentUser.email || '',
-        userPhotoURL: userProfile?.photoURL || '',
-        isAdminOrTeamMember: hasTeamAccess(userProfile),
-        text: updateText.trim() || '',
-        createdAt: Timestamp.now()
-      };
-
-      // Add attachment data if present
-      if (attachmentURL) {
-        updateData.attachmentURL = attachmentURL;
-        updateData.attachmentName = attachmentName;
-        updateData.attachmentType = attachmentType;
-      }
-
-      const docRef = await addDoc(updatesRef, updateData);
-
-      // Refresh updates
-      await fetchOrderUpdates(selectedOrder.id);
-      setUpdateText('');
-      setAttachmentFile(null);
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error('Error posting update:', error);
-      }
-      showError(`Failed to post update: ${(error as any).message || 'Unknown error'}`);
-    } finally {
-      setPostingUpdate(false);
-      setUploadingAttachment(false);
-    }
-  }
-
-  async function updateOrderStatus(newStatus) {
-    if (!selectedOrder) return;
-
-    try {
-      const orderRef = doc(db, 'orders', selectedOrder.id);
-      await updateDoc(orderRef, {
-        status: newStatus,
-        updatedAt: Timestamp.now()
-      });
-
-      // Add system update
-      const updatesRef = collection(db, 'orderUpdates');
-      await addDoc(updatesRef, {
-        orderId: selectedOrder.id,
-        userId: currentUser.uid,
-        userName: t('dashboard.orderModal.system'),
-        userEmail: currentUser.email,
-        text: `${t('dashboard.orderModal.statusChangedTo')} ${getStatusLabel(newStatus)}`,
-        isSystem: true,
-        createdAt: Timestamp.now()
-      });
-
-      // Refresh updates
-      await fetchOrderUpdates(selectedOrder.id);
-      setSelectedOrder({ ...selectedOrder, status: newStatus });
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error('Error updating order status:', error);
-      }
-      showError('Failed to update order status');
-    }
-  }
-
-  async function confirmOrder() {
-    if (!selectedOrder) return;
-
-    try {
-      const orderRef = doc(db, 'orders', selectedOrder.id);
-      await updateDoc(orderRef, {
-        status: OrderStatus.PENDING,
-        confirmedByClient: true,
-        confirmedAt: Timestamp.now(),
-        updatedAt: Timestamp.now()
-      });
-
-      // Add system update
-      const updatesRef = collection(db, 'orderUpdates');
-      await addDoc(updatesRef, {
-        orderId: selectedOrder.id,
-        userId: currentUser.uid,
-        userName: t('dashboard.orderModal.system'),
-        userEmail: currentUser.email,
-        text: t('dashboard.orderModal.orderConfirmedByClient'),
-        isSystem: true,
-        createdAt: Timestamp.now()
-      });
-
-      // Create notification
-      const notificationsRef = collection(db, 'notifications');
-      await addDoc(notificationsRef, {
-        userId: currentUser.uid,
-        type: 'order_confirmed',
-        title: 'Comandă confirmată',
-        message: `Comanda #${selectedOrder.id.substring(0, 8).toUpperCase()} a fost confirmată și este gata de procesare`,
-        orderId: selectedOrder.id,
-        read: false,
-        createdAt: Timestamp.now()
-      });
-
-      // Refresh updates
-      await fetchOrderUpdates(selectedOrder.id);
-      setSelectedOrder({ ...selectedOrder, status: OrderStatus.PENDING, confirmedByClient: true });
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error('Error confirming order:', error);
-      }
-      showError('Eroare la confirmarea comenzii');
-    }
   }
 
   async function restoreOrder() {
@@ -626,28 +396,6 @@ export default function Dashboard() {
       }
       showError(errorMessage);
       throw error;
-    }
-  }
-
-  async function handleDeleteUpdate() {
-    if (!selectedUpdateId) return;
-
-    try {
-      const updateRef = doc(db, 'orderUpdates', selectedUpdateId);
-      await deleteDoc(updateRef);
-
-      // Refresh updates
-      if (selectedOrder) {
-        await fetchOrderUpdates(selectedOrder.id);
-      }
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error('Error deleting update:', error);
-      }
-      showError('Eroare la ștergerea actualizării');
-    } finally {
-      setShowDeleteUpdateDialog(false);
-      setSelectedUpdateId(null);
     }
   }
 
@@ -1005,6 +753,19 @@ export default function Dashboard() {
               <table data-testid="dashboard-orders-table" className="min-w-full divide-y divide-slate-200 dark:divide-slate-700 table-fixed">
                 <thead className="bg-slate-50 dark:bg-slate-800/50">
                   <tr>
+                    {canSelectOrders && (
+                      <th className="w-12 px-4 py-3">
+                        <input
+                          type="checkbox"
+                          data-testid="orders-select-all"
+                          aria-label={t('dashboard.invoicing.selectAll')}
+                          checked={allVisibleSelected}
+                          disabled={selectableVisibleOrders.length === 0}
+                          onChange={toggleSelectAllVisible}
+                          className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 disabled:opacity-40"
+                        />
+                      </th>
+                    )}
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                       {t('dashboard.table.client')}
                     </th>
@@ -1035,14 +796,32 @@ export default function Dashboard() {
                     const totalItems = (order.subOrders || []).length;
                     const totalQuantity = (order.subOrders || []).reduce((sum, so) => sum + (so.quantity || 0), 0);
                     const earliestDelivery = getEarliestDeliveryTime(order.subOrders);
+                    const isBillable = isOrderBillable(order);
+                    const isSelected = selectedOrderIds.includes(order.id);
 
                     return (
                       <tr
                         key={order.id}
                         data-testid={`order-row-${order.id}`}
                         onClick={() => openOrderDetails(order)}
-                        className="hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors"
+                        className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors ${
+                          isSelected ? 'bg-blue-50/70 dark:bg-blue-900/20' : ''
+                        }`}
                       >
+                        {canSelectOrders && (
+                          <td className="w-12 px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              data-testid={`order-select-${order.id}`}
+                              aria-label={t('dashboard.invoicing.selectOrder')}
+                              checked={isSelected}
+                              disabled={!isBillable}
+                              title={isBillable ? undefined : t('dashboard.invoicing.notBillable')}
+                              onChange={() => toggleOrderSelection(order.id)}
+                              className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 disabled:opacity-30 disabled:cursor-not-allowed"
+                            />
+                          </td>
+                        )}
                         <td className="px-6 py-4 text-sm">
                           <div className="font-medium text-slate-900 dark:text-white">{getOrderClientPrimaryName(order) || '-'}</div>
                           {getOrderClientSecondaryName(order) && (
@@ -1070,6 +849,19 @@ export default function Dashboard() {
                           <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.status)}`}>
                             {getStatusLabel(order.status)}
                           </span>
+                          {order.invoiceId && (
+                            <button
+                              data-testid={`order-invoice-chip-${order.id}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate('/invoices');
+                              }}
+                              title={t('dashboard.invoicing.openInvoice')}
+                              className="mt-1 block text-xs font-mono text-indigo-600 dark:text-indigo-400 hover:underline"
+                            >
+                              {order.invoiceNumber || t('invoices.details.draftTitle')}
+                            </button>
+                          )}
                         </td>
                         <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
                           {(() => {
@@ -1136,61 +928,67 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Pagination */}
-          {isPaginated && !loading && totalPages > 1 && (
-            <div
-              data-testid="orders-pagination"
-              className="px-4 sm:px-6 py-4 border-t border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row items-center justify-between gap-3"
-            >
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                {t('dashboard.pagination.showing', {
-                  from: (currentPage - 1) * ORDERS_PER_PAGE + 1,
-                  to: Math.min(currentPage * ORDERS_PER_PAGE, filteredOrders.length),
-                  total: filteredOrders.length
-                })}
-              </p>
-              <div className="flex items-center gap-1">
-                <button
-                  data-testid="pagination-previous"
-                  onClick={() => goToPage(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1.5 rounded-md text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors focus:outline-none"
-                >
-                  {t('dashboard.pagination.previous')}
-                </button>
-                {pageNumbers.map((page, index) =>
-                  page === 'gap' ? (
-                    <span key={`gap-${index}`} className="px-2 text-sm text-slate-400 dark:text-slate-500">
-                      &hellip;
-                    </span>
-                  ) : (
-                    <button
-                      key={page}
-                      data-testid={`pagination-page-${page}`}
-                      onClick={() => goToPage(page)}
-                      aria-current={page === currentPage ? 'page' : undefined}
-                      className={`min-w-9 px-3 py-1.5 rounded-md text-sm transition-colors focus:outline-none ${
-                        page === currentPage
-                          ? 'bg-blue-600 text-white font-semibold'
-                          : 'text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-100 dark:hover:bg-slate-700'
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  )
-                )}
-                <button
-                  data-testid="pagination-next"
-                  onClick={() => goToPage(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1.5 rounded-md text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-colors focus:outline-none"
-                >
-                  {t('dashboard.pagination.next')}
-                </button>
-              </div>
-            </div>
+          {isPaginated && !loading && (
+            <Pagination
+              testId="orders-pagination"
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredOrders.length}
+              pageSize={ORDERS_PER_PAGE}
+              onChange={goToPage}
+            />
           )}
         </div>
+
+      {/* Bulk invoicing bar - only while orders are selected */}
+      {canSelectOrders && selectedOrders.length > 0 && (
+        <div
+          data-testid="orders-selection-bar"
+          className="fixed inset-x-0 bottom-0 z-40 px-4 pb-4 pointer-events-none"
+        >
+          <div className="pointer-events-auto mx-auto max-w-3xl rounded-xl bg-slate-900 dark:bg-slate-700 text-white shadow-lg px-4 sm:px-5 py-3 flex flex-col sm:flex-row items-center gap-3">
+            <div className="flex-1 text-center sm:text-left">
+              <p className="text-sm font-medium">
+                {t('dashboard.invoicing.selectedCount', { count: selectedOrders.length })}
+                <span className="ml-2 tabular-nums text-slate-300">{formatMoney(selectionTotal)}</span>
+              </p>
+              {selectedClientCount > 1 && (
+                <p className="text-xs text-amber-300 mt-0.5">
+                  {t('dashboard.invoicing.multipleClients', { count: selectedClientCount })}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                data-testid="orders-clear-selection"
+                onClick={() => setSelectedOrderIds([])}
+                className="px-3 py-2 rounded-lg text-sm font-medium text-slate-200 hover:bg-white/10 transition-colors"
+              >
+                {t('dashboard.invoicing.clearSelection')}
+              </button>
+              <button
+                data-testid="orders-add-to-invoice"
+                onClick={() => setShowAddToInvoice(true)}
+                className="px-4 py-2 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-cyan-500 hover:opacity-90 transition-opacity"
+              >
+                {t('dashboard.invoicing.addToInvoice')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add selected orders to an invoice */}
+      <AddToInvoiceModal
+        open={showAddToInvoice}
+        onClose={() => setShowAddToInvoice(false)}
+        orders={selectedOrders}
+        invoices={invoices}
+        onDone={() => {
+          setSelectedOrderIds([]);
+          setShowAddToInvoice(false);
+        }}
+      />
 
       {/* Order Details Modal */}
       <OrderDetailsModal

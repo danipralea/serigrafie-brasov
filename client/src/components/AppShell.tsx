@@ -137,6 +137,7 @@ export default function AppShell({ children, title }: { children: React.ReactNod
     { name: t('nav.calendar'), href: '/calendar', current: location.pathname === '/calendar' },
     ...(hasTeamAccess(userProfile)
       ? [
+          { name: t('nav.invoices'), href: '/invoices', current: location.pathname === '/invoices' },
           { name: t('nav.clients'), href: '/clients', current: location.pathname === '/clients' },
         ]
       : []),

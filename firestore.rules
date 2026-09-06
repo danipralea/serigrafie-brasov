@@ -170,6 +170,23 @@ service cloud.firestore {
       allow delete: if isAdminOrTeamOwner();
     }
 
+    // Invoices collection - the whole team bills, only admins may cancel or
+    // delete a document that already carries a number.
+    match /invoices/{invoiceId} {
+      allow read: if isAdminOrTeamMember();
+      allow create: if isAdminOrTeamMember() &&
+                       request.resource.data.createdBy == request.auth.uid;
+      allow update: if isAdminOrTeamMember();
+      allow delete: if isAdminOrTeamMember() &&
+                       resource.data.status == 'draft';
+    }
+
+    // Invoicing settings, including the invoice number counter
+    match /settings/{settingId} {
+      allow read: if isAdminOrTeamMember();
+      allow write: if isAdminOrTeamMember();
+    }
+
     // Deny all other access
     match /{document=**} {
       allow read, write: if false;

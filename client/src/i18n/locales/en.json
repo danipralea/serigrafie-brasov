@@ -162,7 +162,8 @@
     "inviteTeam": "Invite Team",
     "admin": "Admin",
     "profile": "Profile",
-    "signOut": "Sign Out"
+    "signOut": "Sign Out",
+    "invoices": "Invoices"
   },
   "calendar": {
     "title": "Orders Calendar",
@@ -322,6 +323,17 @@
       },
       "orderMovedToTrash": "Order moved to trash",
       "deleteOrderTrashConfirm": "Are you sure you want to delete this order? It will be moved to the trash and can be restored from there."
+    },
+    "invoicing": {
+      "selectAll": "Select all billable orders",
+      "selectOrder": "Select order",
+      "notBillable": "Only completed or delivered orders that are not already on an invoice can be billed",
+      "selectedCount_one": "One order selected",
+      "selectedCount_other": "{{count}} orders selected",
+      "multipleClients": "Selection covers {{count}} clients - one invoice will be created per client",
+      "clearSelection": "Clear",
+      "addToInvoice": "Add to invoice",
+      "openInvoice": "Go to invoices"
     }
   },
   "orderStatus": {
@@ -906,5 +918,142 @@
     "orderStatusChangedMessage": "Order #{{orderId}} status changed to: {{status}}",
     "subOrderCompleted": "Item Completed",
     "subOrderCompletedMessage": "Item \"{{productName}}\" from order #{{orderId}} ({{department}}) has been completed"
+  },
+  "invoices": {
+    "title": "Invoices",
+    "listTitle": "Invoices",
+    "unknownClient": "Unknown client",
+    "orderCount_one": "one order",
+    "orderCount_other": "{{count}} orders",
+    "lineCount_one": "one line",
+    "lineCount_other": "{{count}} lines",
+    "status": {
+      "draft": "Draft",
+      "issued": "Issued",
+      "paid": "Paid",
+      "cancelled": "Cancelled"
+    },
+    "stats": {
+      "uninvoiced": "Uninvoiced orders",
+      "drafts": "Drafts",
+      "unpaid": "Issued, unpaid"
+    },
+    "filters": {
+      "search": "Search",
+      "searchPlaceholder": "Invoice number, client, tax id, order..."
+    },
+    "table": {
+      "number": "Number",
+      "client": "Client",
+      "period": "Period",
+      "orders": "Orders",
+      "total": "Total",
+      "status": "Status"
+    },
+    "empty": {
+      "title": "No invoices",
+      "draft": "Gather finished orders into an invoice draft.",
+      "issued": "No issued invoices match the current filters.",
+      "paid": "No paid invoices match the current filters.",
+      "cancelled": "No cancelled invoices."
+    },
+    "addToInvoice": {
+      "title": "Add to invoice",
+      "subtitle_one": "One order will be added to an invoice.",
+      "subtitle_other": "{{count}} orders will be added to an invoice.",
+      "destination": "Destination",
+      "newDraft": "New draft",
+      "existingDraft": "Draft from {{date}} ({{orders}}, {{total}})",
+      "multipleClients": "An invoice holds one client’s orders, so the selection is split into {{count}} invoices.",
+      "willCreate_one": "One new draft will be created",
+      "willCreate_other": "{{count}} new drafts will be created",
+      "willExtend": "Orders will be added to existing drafts",
+      "confirm": "Add",
+      "saving": "Adding...",
+      "success": "Orders added to the invoice",
+      "partialError": "Could not add orders for: {{clients}}"
+    },
+    "cumulate": {
+      "action": "Cumulative billing",
+      "title": "Cumulative billing",
+      "subtitle": "Groups finished, uninvoiced orders into one draft per client. Nothing is issued automatically.",
+      "presets": {
+        "this-week": "This week",
+        "last-week": "Last week",
+        "this-month": "This month",
+        "last-month": "Last month",
+        "all": "All",
+        "custom": "Custom range"
+      },
+      "from": "From",
+      "to": "To",
+      "periodLabel": "Period: {{from}} - {{to}}",
+      "emptyTitle": "Nothing to bill",
+      "emptyDesc": "No finished, uninvoiced orders in the chosen period.",
+      "unpricedWarning_one": "One order has no price - fill the amount in before issuing",
+      "unpricedWarning_other": "{{count}} orders have no price - fill the amounts in before issuing",
+      "summary": "Invoices: {{invoices}} · Orders: {{orders}} · Total: {{total}}",
+      "run_one": "Create one draft",
+      "run_other": "Create {{count}} drafts",
+      "running": "Creating...",
+      "success_one": "One invoice draft created",
+      "success_other": "{{count}} invoice drafts created",
+      "partialError_one": "One invoice could not be created",
+      "partialError_other": "{{count}} invoices could not be created",
+      "error": "Error creating invoices"
+    },
+    "details": {
+      "draftTitle": "Draft",
+      "created": "Created",
+      "period": "Period",
+      "noPeriod": "No period",
+      "issuedAt": "Issued",
+      "dueDate": "Due",
+      "client": "Client",
+      "missingCui": "This client has no tax id - add it on the client sheet before issuing.",
+      "orders": "Billed orders",
+      "addOrders": "Add orders",
+      "noAddableOrders": "No other finished orders for this client.",
+      "add": "Add",
+      "emptyOrders": "This invoice holds no orders.",
+      "noLines": "This order has no lines.",
+      "removeOrder": "Remove order from invoice",
+      "notes": "Notes",
+      "notesPlaceholder": "Notes shown on the invoice",
+      "noNotes": "No notes",
+      "subtotal": "Subtotal",
+      "vat": "VAT",
+      "total": "Total",
+      "unpricedLines_one": "One line has no amount",
+      "unpricedLines_other": "{{count}} lines have no amount",
+      "save": "Save",
+      "saved": "Changes saved",
+      "saveError": "Error saving the invoice",
+      "issue": "Issue invoice",
+      "issueConfirm": "The invoice gets a number and can no longer be edited. {{orders}}, total {{total}}.",
+      "issued": "Invoice {{number}} issued",
+      "issueError": "Error issuing the invoice",
+      "issueEmptyError": "Add at least one order before issuing",
+      "deleteDraft": "Delete draft",
+      "deleteConfirm": "The draft is deleted and its orders become billable again.",
+      "deleted": "Draft deleted",
+      "deleteError": "Error deleting the draft",
+      "cancelInvoice": "Cancel invoice",
+      "cancelConfirm": "The invoice stays on record as cancelled and its orders become billable again.",
+      "cancelled": "Invoice cancelled",
+      "cancelError": "Error cancelling the invoice",
+      "markPaid": "Mark as paid",
+      "markUnpaid": "Mark as unpaid",
+      "paidError": "Error updating the payment state",
+      "download": "Download PDF",
+      "downloadError": "Error downloading the invoice",
+      "send": "Send to client",
+      "sent": "Invoice sent",
+      "sendError": "Error sending the invoice",
+      "orderAdded": "Order added",
+      "orderAddError": "Error adding the order",
+      "orderRemoved": "Order removed from the invoice",
+      "orderRemoveError": "Error removing the order"
+    }
   }
 }

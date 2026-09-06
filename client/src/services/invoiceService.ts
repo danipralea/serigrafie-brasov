@@ -8,8 +8,13 @@ import {
   getPositioningTotalCost,
   normalizePositioning
 } from '../utils/positioning';
+import {
+  DEFAULT_CURRENCY,
+  formatMoney,
+  getInvoiceClientLabel
+} from '../utils/invoicing';
 
-/** One line on the invoice - mirrors a sub-order of the order. */
+/** One line on the invoice - mirrors a sub-order of an order. */
 export interface InvoiceItem {
   productType: string;
   quantity?: number | null;
@@ -19,25 +24,50 @@ export interface InvoiceItem {
   amount?: number | null;
 }
 
+/**
+ * A block of lines under its own heading. A single-order invoice has one
+ * group; a cumulative invoice has one per order it gathers.
+ */
+export interface InvoiceGroup {
+  title: string;
+  subtitle?: string;
+  items: InvoiceItem[];
+}
+
 export interface InvoiceData {
   orderId: string;
   orderNumber: string;
   orderName?: string;
+  /** Fiscal number (`SB-2026-0007`). Falls back to the order number. */
+  invoiceNumber?: string;
   clientName: string;
   clientEmail?: string;
   clientPhone?: string;
   clientCompany?: string;
   /** Romanian tax id (CUI / cod fiscal) of the client's company. */
   clientCui?: string;
+  clientAddress?: string;
   items: InvoiceItem[];
+  /** When set, the document renders these blocks instead of a flat item list. */
+  groups?: InvoiceGroup[];
   createdAt?: Date;
   completedAt?: Date;
+  issuedAt?: Date;
+  dueDate?: Date;
+  periodStart?: Date;
+  periodEnd?: Date;
+  currency?: string;
+  /** Percentage. Zero or missing renders a single total, with no VAT split. */
+  vatRate?: number | null;
+  subtotal?: number | null;
+  vatAmount?: number | null;
+  notes?: string;
   /** Invoice total; derived from the item amounts when not given. */
   amount?: number | null;
 }
 
-function money(value: number | null | undefined): string {
-  return value === null || value === undefined ? '---' : `${value.toFixed(2)} RON`;
+function money(value: number | null | undefined, currency = DEFAULT_CURRENCY): string {
+  return formatMoney(value, currency);
 }
 
 function getItemAmount(item: InvoiceItem): number | null {
@@ -45,13 +75,29 @@ function getItemAmount(item: InvoiceItem): number | null {
   return getPositioningTotalCost(item.positioning || []);
 }
 
-function getInvoiceTotal(invoiceData: InvoiceData): number | null {
-  if (invoiceData.amount !== null && invoiceData.amount !== undefined) return invoiceData.amount;
-  const amounts = (invoiceData.items || [])
+/** Every line in the document, whether it came flat or in groups. */
+function getAllItems(invoiceData: InvoiceData): InvoiceItem[] {
+  if (invoiceData.groups && invoiceData.groups.length > 0) {
+    return invoiceData.groups.flatMap(group => group.items || []);
+  }
+  return invoiceData.items || [];
+}
+
+function getInvoiceSubtotal(invoiceData: InvoiceData): number | null {
+  if (invoiceData.subtotal !== null && invoiceData.subtotal !== undefined) return invoiceData.subtotal;
+  const amounts = getAllItems(invoiceData)
     .map(getItemAmount)
     .filter((amount): amount is number => amount !== null);
   if (amounts.length === 0) return null;
   return Math.round(amounts.reduce((sum, amount) => sum + amount, 0) * 100) / 100;
+}
+
+function getInvoiceTotal(invoiceData: InvoiceData): number | null {
+  if (invoiceData.amount !== null && invoiceData.amount !== undefined) return invoiceData.amount;
+  const subtotal = getInvoiceSubtotal(invoiceData);
+  if (subtotal === null) return null;
+  const rate = invoiceData.vatRate || 0;
+  return Math.round(subtotal * (1 + rate / 100) * 100) / 100;
 }
 
 /**
@@ -82,6 +128,69 @@ export function buildInvoiceData(order: any): InvoiceData {
 }
 
 /**
+ * Builds the payload for a cumulative invoice: one group per order it gathers,
+ * with the frozen lines and totals already stored on the invoice document.
+ */
+export function buildCumulativeInvoiceData(invoice: any): InvoiceData {
+  const lines: any[] = Array.isArray(invoice?.lines) ? invoice.lines : [];
+  const orderRefs: any[] = Array.isArray(invoice?.orders) ? invoice.orders : [];
+
+  const groups: InvoiceGroup[] = orderRefs.map(orderRef => ({
+    title: orderRef?.name ? `#${orderRef.number} - ${orderRef.name}` : `#${orderRef?.number || '-'}`,
+    subtitle: orderRef?.createdAtMillis ? formatDate(new Date(orderRef.createdAtMillis)) : '',
+    items: lines
+      .filter(line => line?.orderId === orderRef?.id)
+      .map(line => ({
+        productType: line?.productType || '-',
+        quantity: line?.quantity ?? null,
+        description: line?.description || '',
+        positioning: normalizePositioning(line?.positioning),
+        amount: line?.amount ?? null
+      }))
+  }));
+
+  // Lines whose order reference went missing still have to be billed.
+  const orphanLines = lines.filter(line => !orderRefs.some(ref => ref?.id === line?.orderId));
+  if (orphanLines.length > 0) {
+    groups.push({
+      title: '-',
+      items: orphanLines.map(line => ({
+        productType: line?.productType || '-',
+        quantity: line?.quantity ?? null,
+        description: line?.description || '',
+        positioning: normalizePositioning(line?.positioning),
+        amount: line?.amount ?? null
+      }))
+    });
+  }
+
+  return {
+    orderId: invoice?.id || '',
+    orderNumber: invoice?.number || (invoice?.id ? String(invoice.id).substring(0, 8).toUpperCase() : ''),
+    invoiceNumber: invoice?.number || '',
+    clientName: invoice?.clientName || getInvoiceClientLabel(invoice) || 'Client',
+    clientCompany: invoice?.clientCompany || '',
+    clientCui: invoice?.clientCui || '',
+    clientEmail: invoice?.clientEmail || '',
+    clientPhone: invoice?.clientPhone || '',
+    clientAddress: invoice?.clientAddress || '',
+    items: [],
+    groups,
+    createdAt: invoice?.createdAt?.toDate?.(),
+    issuedAt: invoice?.issuedAt?.toDate?.(),
+    dueDate: invoice?.dueDate?.toDate?.(),
+    periodStart: invoice?.periodStart?.toDate?.(),
+    periodEnd: invoice?.periodEnd?.toDate?.(),
+    currency: invoice?.currency || DEFAULT_CURRENCY,
+    vatRate: invoice?.vatRate ?? 0,
+    subtotal: invoice?.subtotal ?? null,
+    vatAmount: invoice?.vatAmount ?? null,
+    amount: invoice?.total ?? null,
+    notes: invoice?.notes || ''
+  };
+}
+
+/**
  * Reads the CUI from the client record. Orders placed before the field existed
  * carry no `clientCui`, so the invoice falls back to the client sheet.
  */
@@ -98,6 +207,7 @@ export async function fetchClientCui(clientId?: string): Promise<string> {
 export function generateInvoicePDF(invoiceData: InvoiceData): jsPDF {
   const doc = new jsPDF();
   const pageHeight = doc.internal.pageSize.getHeight();
+  const currency = invoiceData.currency || DEFAULT_CURRENCY;
 
   // Company Header
   doc.setFontSize(24);
@@ -117,24 +227,46 @@ export function generateInvoicePDF(invoiceData: InvoiceData): jsPDF {
   // Invoice Number and Date
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Numar factura / Invoice Number: ${invoiceData.orderNumber || '-'}`, 20, 65);
+  let headerY = 65;
   doc.text(
-    `Data / Date: ${formatDate(invoiceData.completedAt || invoiceData.createdAt || new Date())}`,
+    `Numar factura / Invoice Number: ${invoiceData.invoiceNumber || invoiceData.orderNumber || '-'}`,
     20,
-    72
+    headerY
   );
+  headerY += 7;
+  doc.text(
+    `Data / Date: ${formatDate(
+      invoiceData.issuedAt || invoiceData.completedAt || invoiceData.createdAt || new Date()
+    )}`,
+    20,
+    headerY
+  );
+  if (invoiceData.dueDate) {
+    headerY += 7;
+    doc.text(`Scadenta / Due date: ${formatDate(invoiceData.dueDate)}`, 20, headerY);
+  }
+  if (invoiceData.periodStart && invoiceData.periodEnd) {
+    headerY += 7;
+    doc.text(
+      `Perioada / Period: ${formatDate(invoiceData.periodStart)} - ${formatDate(invoiceData.periodEnd)}`,
+      20,
+      headerY
+    );
+  }
   if (invoiceData.orderName) {
-    doc.text(`Comanda / Order: ${invoiceData.orderName}`, 20, 79);
+    headerY += 7;
+    doc.text(`Comanda / Order: ${invoiceData.orderName}`, 20, headerY);
   }
 
   // Client Information
+  let y = headerY + 13;
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text('Date client / Client Information:', 20, 92);
+  doc.text('Date client / Client Information:', 20, y);
 
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  let y = 100;
+  y += 8;
   doc.text(`Nume / Name: ${invoiceData.clientName || '-'}`, 20, y);
   if (invoiceData.clientCompany) {
     y += 7;
@@ -143,6 +275,10 @@ export function generateInvoicePDF(invoiceData: InvoiceData): jsPDF {
   if (invoiceData.clientCui) {
     y += 7;
     doc.text(`CUI / Tax ID: ${invoiceData.clientCui}`, 20, y);
+  }
+  if (invoiceData.clientAddress) {
+    y += 7;
+    doc.text(`Adresa / Address: ${invoiceData.clientAddress}`, 20, y);
   }
   if (invoiceData.clientEmail) {
     y += 7;
@@ -183,16 +319,8 @@ export function generateInvoicePDF(invoiceData: InvoiceData): jsPDF {
     drawTableHeader();
   }
 
-  const items = invoiceData.items || [];
-
-  if (items.length === 0) {
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'italic');
-    doc.text('Nicio pozitie / No items', 25, y);
-    y += 8;
-  }
-
-  items.forEach((item, index) => {
+  /** Renders one line of the table. */
+  function drawItem(item: InvoiceItem, label: string) {
     const positions = item.positioning || [];
     const positioningText = positions.length > 0 ? formatPositioning(positions) : '';
     const detailLines: string[] = [];
@@ -208,9 +336,9 @@ export function generateInvoicePDF(invoiceData: InvoiceData): jsPDF {
 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(`${index + 1}. ${item.productType || '-'}`, 25, y);
+    doc.text(`${label} ${item.productType || '-'}`, 25, y);
     doc.text(item.quantity === null || item.quantity === undefined ? '-' : String(item.quantity), 120, y);
-    doc.text(money(getItemAmount(item)), 155, y);
+    doc.text(money(getItemAmount(item), currency), 155, y);
 
     if (detailLines.length > 0) {
       y += 5;
@@ -222,18 +350,83 @@ export function generateInvoicePDF(invoiceData: InvoiceData): jsPDF {
     }
 
     y += 6;
+  }
+
+  const groups: InvoiceGroup[] =
+    invoiceData.groups && invoiceData.groups.length > 0
+      ? invoiceData.groups
+      : [{ title: '', items: invoiceData.items || [] }];
+
+  const hasAnyItem = groups.some(group => (group.items || []).length > 0);
+
+  if (!hasAnyItem) {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'italic');
+    doc.text('Nicio pozitie / No items', 25, y);
+    y += 8;
+  }
+
+  let itemCounter = 0;
+
+  groups.forEach(group => {
+    const items = group.items || [];
+    if (items.length === 0) return;
+
+    if (group.title) {
+      ensureSpace(12);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(59, 130, 246);
+      const heading = group.subtitle ? `${group.title}  -  ${group.subtitle}` : group.title;
+      doc.text(doc.splitTextToSize(heading, 165), 22, y);
+      doc.setTextColor(0, 0, 0);
+      y += 6;
+    }
+
+    items.forEach(item => {
+      itemCounter++;
+      drawItem(item, `${itemCounter}.`);
+    });
   });
 
-  // Total
-  ensureSpace(20);
+  // Totals
+  const subtotal = getInvoiceSubtotal(invoiceData);
+  const vatRate = invoiceData.vatRate || 0;
+  const vatAmount =
+    invoiceData.vatAmount ?? (subtotal === null ? null : Math.round(subtotal * vatRate) / 100);
+
+  ensureSpace(vatRate > 0 ? 34 : 20);
   y += 4;
   doc.setDrawColor(200, 200, 200);
   doc.line(20, y, 190, y);
   y += 8;
+
+  if (vatRate > 0) {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Subtotal:', 130, y);
+    doc.text(money(subtotal, currency), 155, y);
+    y += 7;
+    doc.text(`TVA / VAT (${vatRate}%):`, 130, y);
+    doc.text(money(vatAmount, currency), 155, y);
+    y += 8;
+  }
+
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
   doc.text('Total:', 130, y);
-  doc.text(money(getInvoiceTotal(invoiceData)), 155, y);
+  doc.text(money(getInvoiceTotal(invoiceData), currency), 155, y);
+
+  if (invoiceData.notes) {
+    y += 12;
+    const noteLines = doc.splitTextToSize(invoiceData.notes, 165);
+    ensureSpace(6 + noteLines.length * 5);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(90, 90, 90);
+    doc.text(noteLines, 20, y);
+    doc.setTextColor(0, 0, 0);
+  }
 
   // Footer on every page
   const pageCount = doc.getNumberOfPages();
@@ -253,7 +446,7 @@ export function generateInvoicePDF(invoiceData: InvoiceData): jsPDF {
 
 export function downloadInvoice(invoiceData: InvoiceData): void {
   const doc = generateInvoicePDF(invoiceData);
-  doc.save(`Factura_${invoiceData.orderNumber || invoiceData.orderId}.pdf`);
+  doc.save(`Factura_${invoiceData.invoiceNumber || invoiceData.orderNumber || invoiceData.orderId}.pdf`);
 }
 
 export async function sendInvoiceToClient(invoiceData: InvoiceData): Promise<void> {
@@ -268,7 +461,7 @@ export async function sendInvoiceToClient(invoiceData: InvoiceData): Promise<voi
   await addDoc(notificationsRef, {
     type: 'invoice_sent',
     title: 'Invoice sent',
-    message: `Invoice for order #${invoiceData.orderNumber} has been sent to ${invoiceData.clientEmail || ''}`,
+    message: `Invoice for order #${invoiceData.invoiceNumber || invoiceData.orderNumber} has been sent to ${invoiceData.clientEmail || ''}`,
     orderId: invoiceData.orderId,
     read: false,
     createdAt: Timestamp.now()

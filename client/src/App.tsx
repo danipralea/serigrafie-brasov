@@ -18,6 +18,7 @@ const AcceptInvitation = lazy(() => import('./pages/AcceptInvitation'));
 const TeamManagement = lazy(() => import('./pages/TeamManagement'));
 const Clients = lazy(() => import('./pages/Clients'));
 const Suppliers = lazy(() => import('./pages/Suppliers'));
+const Invoices = lazy(() => import('./pages/Invoices'));
 
 // Loading fallback component
 function LoadingFallback() {
@@ -80,6 +81,14 @@ function App() {
                   element={
                     <PrivateRoute>
                       <Clients />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/invoices"
+                  element={
+                    <PrivateRoute>
+                      <Invoices />
                     </PrivateRoute>
                   }
                 />
