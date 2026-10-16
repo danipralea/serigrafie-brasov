@@ -76,6 +76,7 @@ function SubOrderItem({ subOrder, index, onChange, onRemove, canRemove, departme
   const { currentUser, userProfile } = useAuth();
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
   const [internalCollapsed, setInternalCollapsed] = useState(false);
 
   const isControlled = collapsed !== undefined;
@@ -91,7 +92,39 @@ function SubOrderItem({ subOrder, index, onChange, onRemove, canRemove, departme
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file || !currentUser) return;
+    e.target.value = '';
+    if (file) await uploadDesignFile(file);
+  }
+
+  function handleDragOver(e: React.DragEvent<HTMLLabelElement>) {
+    e.preventDefault();
+    if (!uploadingFile) setIsDragging(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent<HTMLLabelElement>) {
+    e.preventDefault();
+    // Ignore leave events fired when moving over child elements
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setIsDragging(false);
+  }
+
+  async function handleDrop(e: React.DragEvent<HTMLLabelElement>) {
+    e.preventDefault();
+    setIsDragging(false);
+    if (uploadingFile) return;
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
+      setUploadError(t('placeOrder.fileTypeError'));
+      return;
+    }
+
+    await uploadDesignFile(file);
+  }
+
+  async function uploadDesignFile(file: File) {
+    if (!currentUser) return;
 
     // Check file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
@@ -281,12 +314,24 @@ function SubOrderItem({ subOrder, index, onChange, onRemove, canRemove, departme
             <div>
               <label
                 htmlFor={`file-upload-${subOrder.id}`}
-                className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-slate-600 rounded-lg cursor-pointer bg-white dark:bg-slate-700 hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors"
+                onDragOver={handleDragOver}
+                onDragEnter={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
+                  isDragging
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                    : 'border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:bg-gray-50 dark:hover:bg-slate-600'
+                }`}
               >
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  <PhotoIcon className="w-10 h-10 mb-2 text-gray-400 dark:text-gray-500" />
+                  <PhotoIcon className={`w-10 h-10 mb-2 ${isDragging ? 'text-blue-500' : 'text-gray-400 dark:text-gray-500'}`} />
                   <p className="mb-1 text-sm text-gray-500 dark:text-gray-400">
-                    <span className="font-semibold">{uploadingFile ? t('placeOrder.uploading') : t('placeOrder.clickToUpload')}</span>
+                    <span className="font-semibold">{uploadingFile
+                        ? t('placeOrder.uploading')
+                        : isDragging
+                          ? t('placeOrder.dropToUpload')
+                          : t('placeOrder.clickOrDragToUpload')}</span>
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">{t('placeOrder.fileTypes')}</p>
                 </div>
